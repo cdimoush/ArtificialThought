@@ -1,0 +1,88 @@
+summary_0: 'Summary: The speaker proposes a concept for an automated AI system that
+  can transcribe audio to text, process that text, and further generate concise summaries.
+  This idea is inspired by the challenge of articulating ideas and intentions effectively
+  in off-the-cuff audio recordings. The proposed system will involve a chain of language
+  models tasked with correcting errors, summarizing content, and extracting useful
+  information from the ramblings. Despite being primarily an art project, the system
+  could yield interesting and useful results if executed properly.'
+summary_1: 'Summary: The speaker proposes a project for improving data processing
+  in audio-to-text conversions. Rather than using raw data from basic converters like
+  Google Speech API, the project should manage, clean, and label the data to create
+  a high-quality dataset. The aim is to compress larger, messier data into concise,
+  articulate thoughts, enhancing data analysis and usability in machine learning and
+  artificial intelligence applications.'
+summary_2: 'Summary: The project, aimed at storing and visually representing ideas,
+  was inspired by another plan to consolidate articles and news. It incorporates artificial
+  intelligence technology to act as a journalist, conduct research from existing content,
+  and produce reports. This process involves data analysis, data visualization, and
+  software development.'
+summary_3: 'Summary: The speaker discusses a project involving downloading instructional
+  YouTube videos, particularly in technical fields like science and math. The subtitles
+  or closed captions from these videos are extracted and stored in a vector database.
+  This database can then be queried by a chatbot, allowing it to access relevant information
+  during a conversation. Essentially, the chatbot can draw on knowledge it has ''gained''
+  from watching these videos to assist users discussing topics like math or science.'
+summary_4: 'Summary: The project, named Genesis, is a learning platform that also
+  functions as a chat room. It''s primarily a development space for sophisticated
+  conversations with different individuals who specialize in specific subjects. The
+  system utilizes large language models and AI agents, allowing for complex code deployment
+  and the selection of system prompts before making API calls. A unique feature is
+  a chat button with a rolling memory behind the scenes. The platform also includes
+  a user role selection feature, which allows users to choose the agent personality
+  they want to chat with, thus streamlining the process of passing queries onto the
+  correct system prompt.'
+thought_0: "OK, so I had this idea where I can take audio to text and store inside\
+  \ a AI brain that will process the text and turn it into more concise summarizations.\
+  \ The idea really stems out of the inability to concisely accurately and effectively\
+  \ describe plants and intention when recording audio off the cuff. For example,\
+  \ this sort of ramble here is a attempted articulation at a more sophisticated idea.\
+  \ it can potentially generally get a point across but will never contain all of\
+  \ the necessary items to complete set project or task contradictory statements.\
+  \ Any who the idea here is to have the LLMBA chain of multiple LM models with specific\
+  \ prompts for handling with The large rambles that come in in firstly, raw audio\
+  \ to text then it will be the LOM, responsibilities to first correct most basic\
+  \ errors, then perform summaries, and then extract useful information. It will also\
+  \ be the LLM or the AI discretion to extract certain concepts. This is going to\
+  \ be a majority automated process, wish more of potentially an art project than\
+  \ an affective tool however, if properly interesting useful results could come out.\
+  \ \n"
+thought_1: "So I have been thinking and now I am talking about a project where you\
+  \ store audio to text conversions. However, I\u2019m not interested in the raw text\
+  \ from a more basic converter like Google speech, API or pockets. Thanks what I\
+  \ am interested in is for the project itself to be able to except clean and modify\
+  \ the raw inputs. Almost like creating a higher quality cleaned up labeled data\
+  \ set. The idea here is that the , larger looser dirtier data can be compressed\
+  \ down, so larger, loose semantics press down into articulate backed thoughts that\
+  \ can be presented to either the user or or or other people.\n"
+thought_2: 'I think the project for storing ideas, and then displaying them in a consolidated
+  improved format, first stemmed from another project idea, which was the consolidation
+  of articles and news, and then have a sort of bot or AI. That is a journalist and
+  can read and do research from previously publish material, and then use that material
+  to produce a report .
+
+  '
+thought_3: "One idea that I\u2019ve been working with is the download of YouTube videos\
+  \ I\u2019m more interested in videos that have content to them that service either\
+  \ classes or instruction. I\u2019m especially interested in technical disciplines\
+  \ like science and math. What I\u2019m doing with these download videos is extracting\
+  \ the subtitles or close caption text And storing them inside a vector database.\
+  \ Then a chat pot more common chat, like CBT for through the open AI website that\
+  \ sort of chat can query the database. If it feels like there is information that\
+  \ exist in it that is relevant to a conversation. So if, the user would like to\
+  \ talk about math and sort of think about the chat but as have watching a bunch\
+  \ of YouTube videos, was able to recall information on the spot and utilize it to\
+  \ assist the user in and chat dialogue.\n"
+thought_4: Another idea is just a learning platform maybe or I guess I had aspirations
+  that could be more but I called the project. Genesis Genesis was a sort of room
+  or development space for chat, but I thought about it more as a room that you enter
+  into have a conversation with one other individual, but certain individuals in the
+  room might be better or more Signed to talk about specific subjects, easiest and
+  most direct approach was just having the ability to select new system prompts for
+  large language models before making API calls and putting in the framework is a
+  chat button so be able to have a rolling memory behind the scenes, the project into
+  the ability to deploy more complex code large language models used as AI agents
+  so the ability to call functions. Currently have an implemented to crazy of a function
+  really the only one that I use now consistently is a switch where someone is, taking
+  the users role of selecting that system, prompt or the type of agent personality
+  they want to be chatting with and instead there is a general point that can use
+  discretion in order to pass the query onto the correct system prompt.
