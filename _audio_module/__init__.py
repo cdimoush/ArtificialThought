@@ -1,13 +1,11 @@
 import json
 import os
-import time
 from typing import Optional
 
 import streamlit.components.v1 as components
 
-
-
 _RELEASE = True
+_DEFAULT_TEST = False
 
 if _RELEASE:
     parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +23,7 @@ else:
 def audio_recorder(
     text: str = "Click to record",
     energy_threshold: float = 0.01,
-    pause_threshold: float = 5.0,
+    pause_threshold: float = 0.8,
     neutral_color: str = "#303030",
     recording_color: str = "#de1212",
     icon_name: str = "microphone",
@@ -91,16 +89,11 @@ def audio_recorder(
         key=key,
         default=None,
     )
-
-    # DEBUG LETS SEE WHAT THE DATA IS
-    # if data:
-    #     print(type(data))
-    #     print(json.loads(data))
     audio_bytes = bytes(json.loads(data)) if data else None
     return audio_bytes
 
 
-if not _RELEASE:
+if _DEFAULT_TEST:
     import streamlit as st
 
     st.subheader("Base audio recorder")
@@ -108,26 +101,4 @@ if not _RELEASE:
     if base_audio_bytes:
         st.audio(base_audio_bytes, format="audio/wav")
 
-    st.subheader("Custom recorder")
-    custom_audio_bytes = audio_recorder(
-        text="",
-        recording_color="#e8b62c",
-        neutral_color="#6aa36f",
-        icon_name="user",
-        icon_size="6x",
-        sample_rate=41_000,
-        key="custom"
-    )
-    st.text("Click to record")
-    if custom_audio_bytes:
-        st.audio(custom_audio_bytes, format="audio/wav")
 
-    st.subheader("Fixed length recorder")
-    fixed_audio_bytes = audio_recorder(
-        energy_threshold=(-1.0, 1.0),
-        pause_threshold=3.0,
-        key="fixed",
-    )
-    st.text("Click to record 3 seconds")
-    if fixed_audio_bytes:
-        st.audio(fixed_audio_bytes, format="audio/wav")

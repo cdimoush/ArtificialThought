@@ -6,7 +6,7 @@ import time
 import streamlit as st
 import assemblyai as aai
 # athought modules
-from _audio_module.audio_recorder_streamlit import audio_recorder
+from _audio_module.__init__ import audio_recorder
 from _summary_module.summary_chain import LabelChain, CleanUpChain, SummaryChain 
 
 
@@ -14,7 +14,7 @@ label_chain = LabelChain()
 cleanup_chain = CleanUpChain()
 summary_chain = SummaryChain()
 
-# import audio_recorder_streamlit
+# import audrecorder_streamlit
 st.title('Artifical Thought Experiment')
 
 # Get the API key from the environment variable
