@@ -6,7 +6,8 @@ import time
 import streamlit as st
 import assemblyai as aai
 # athought modules
-from _audio_module.__init__ import audio_recorder
+# from _audio_module.__init__ import audio_recorder
+from _assemblyai_module.__init__ import audio_recorder
 from _summary_module.summary_chain import LabelChain, CleanUpChain, SummaryChain 
 
 
@@ -17,41 +18,10 @@ summary_chain = SummaryChain()
 # import audrecorder_streamlit
 st.title('Artifical Thought Experiment')
 
-# Get the API key from the environment variable
-api_key = os.getenv('ASSEMBLYAI_API_KEY')
-# Set the API key in the AssemblyAI settings
-aai.settings.api_key = api_key
-transcriber = aai.Transcriber()
-
-def transcribe_audio(transcriber, audio_bytes):
-    # Create a BytesIO object from the audio bytes
-    audio_file = BytesIO(audio_bytes)
-    try:
-        # Upload the audio data
-        response = transcriber._client.http_client.post(
-            'https://api.assemblyai.com/v2/upload',
-            content=audio_file,
-        )
-        response.raise_for_status()  # Raises an exception if the response contains an HTTP error status code
-        audio_url = response.json()["upload_url"]
-    except Exception as e:
-        st.error(f"Failed to upload audio data: {e}")
-        return None
-
-    try:
-        # Transcribe the uploaded audio data
-        transcript = transcriber.transcribe(audio_url)
-    except Exception as e:
-        st.error(f"Failed to transcribe audio data: {e}")
-        return None
-
-    return transcript
-
-def audio_state_button():
+def state_button():
     st.session_state['audio_state'] = not st.session_state['audio_state']
-
-def ai_state_button():
     st.session_state['ai_state'] = not st.session_state['ai_state']
+    st.session_state['rerender'] = True
 
 def main():
     # Check if we're in the initial state
@@ -84,27 +54,18 @@ def main():
             st.write("Click on the microphone to record a message. Click on the microphone again to stop recording.")
             container = st.container(border=True)
             with container:
-                audio_bytes = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
-                st.session_state['audio_bytes'] = audio_bytes
-
-    if st.session_state['audio_bytes']:
-        with st.chat_message("user"):
-            st.audio(st.session_state['audio_bytes'], format='audio/wav')
-        if st.session_state['audio_state']:
+                st.session_state['transcript'] = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
+        
+        if st.session_state['transcript']:
+            with st.chat_message("user"):
+                st.write(st.session_state['transcript'])
             with st.chat_message("assistant"):
-                st.write("Looks like some audio was captured. If you're happy with the recording, click the button below to transcribe the audio.")
-                st.button('Save Audio', on_click=audio_state_button)
+                st.write("Looks like some audio was captured. If you're happy with the recording, click the button below to continue.")
+                st.button('Save Audio', on_click=state_button)
 
     # AI State - Do Summarization
     if st.session_state['ai_state'] and not st.session_state['rerender']:
         print('entered ai state')
-        # Transcribe / Label the audio
-        with st.chat_message("assistant"):
-            st.write("Give me a second to to listen to the audio and transcribe your message.")
-        st.session_state['audio_state'] = False
-        audio_bytes = None
-        st.session_state['transcript'] = transcribe_audio(transcriber, st.session_state['audio_bytes']).text
-        st.session_state['labels'] = LabelChain().invoke({'transcript': st.session_state['transcript']})
         with st.chat_message("user"):
             st.write(st.session_state['transcript'])
 
@@ -139,10 +100,10 @@ def main():
         with st.chat_message("output", avatar="✅"):
             st.write(summary)
 
-    if not st.session_state['audio_state'] and not st.session_state['ai_state']:
-        with st.chat_message("assistant"):
-            st.write("We can now use AI to process the saved audio. Are you ready?")
-            st.button('Initialize AI Sequence', on_click=ai_state_button)
+    # Rerender the page
+    if st.session_state['rerender']:
+        st.session_state['rerender'] = False
+        st.rerun()
 
 
 if __name__ == "__main__":

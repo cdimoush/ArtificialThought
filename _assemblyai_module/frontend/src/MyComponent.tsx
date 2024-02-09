@@ -7,18 +7,21 @@ import {
   StreamlitComponentBase,
   withStreamlitConnection
 } from "streamlit-component-lib";
-import { AssemblyAI, TranscriptService, FileService } from 'assemblyai';
+import { AssemblyAI } from 'assemblyai';
+
 
 library.add(fas)
 
-// Create an AssemblyAI client with your API key
+// BAD IDEA BAD IDEA BAD IDEA, FIX LATER
+const apiKey = process.env.REACT_APP_ASSEMBLYAI_API_KEY as string;
+
 const client = new AssemblyAI({
-  apiKey: process.env.ASSEMBLYAI_API_KEY as string,
+  apiKey: apiKey,
 });
 
-const transcriptService = new TranscriptService({ apiKey: process.env.ASSEMBLYAI_API_KEY as string}, new FileService({ apiKey: process.env.ASSEMBLYAI_API_KEY as string}));
 interface AudioRecorderState {
   color: string
+  status: string
 }
 
 interface AudioData {
@@ -33,32 +36,62 @@ interface AudioRecorderProps {
   disabled: boolean
 }
 
+async function transcribeAudio(data: AudioData): Promise<string> {
+  let audioUrl = '';
 
-async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   try {
-    // Transcribe the audio buffer
-    const transcript = await transcriptService.transcribe({ audio: audioBuffer });
+    // Prepare the request options including the API key for AssemblyAI
+    const requestOptions = {
+      method: 'POST',
+      headers: {
+        'Authorization': apiKey,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: data.blob,
+    };
+
+    // Perform the upload to AssemblyAI
+    const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', requestOptions);
+    const uploadResult = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error('Audio upload failed: ' + uploadResult.error);
+    }
+
+    audioUrl = uploadResult.upload_url;
+  } catch (error) {
+    console.error(error);
+    return 'An error occurred while uploading the audio: ';
+  }
+
+  try {
+    // Assuming transcriptService.transcribe works correctly with the audio URL
+    let transcript = await client.transcripts.transcribe({
+      audio: audioUrl,
+    });
   
-    // Check if the transcription was successful
     if (transcript.status === 'completed') {
       return transcript.text as string;
     } else {
-      throw new Error('Transcription failed');
+      throw new Error('Transcription failed: ' + transcript.status);
     }
   } catch (error) {
     console.error(error);
-    return 'An error occurred while transcribing the audio';
+    return 'An error occurred while transcribing the audio: ';
   }
 }
+
 
 class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   public constructor(props: AudioRecorderProps) {
     super(props)
-    this.state = { color: this.props.args["neutral_color"] }
+    this.state = { color: this.props.args["neutral_color"], status: ""}
   }
 
   stream: MediaStream | null = null;
-  AudioContext = window.AudioContext || window.webkitAudioContext;
+  // AudioContext = window.AudioContext || window.webkitAudioContext;
+  AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
+
   type: string = "audio/wav";
   sampleRate: number | null = null;
   phrase_buffer_count: number | null = null;
@@ -77,6 +110,9 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   recordingLength: number = 0;
   tested: boolean = false;
 
+  // Click debounce
+  private lastClick = Date.now();
+
   //get mic stream
   getStream = (): Promise<MediaStream> => {
     return navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -84,7 +120,8 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
   setupMic = async () => {
     try {
-      window.stream = this.stream = await this.getStream();
+      // window.stream = this.stream = await this.getStream();
+      (window as any).stream = this.stream = await this.getStream();
     } catch (err) {
       console.log("Error: Issue getting mic", err);
     }
@@ -146,41 +183,29 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       this.sampleRate = input_sample_rate;
     }
     console.log(`Sample rate ${this.sampleRate}Hz`);
-
+  
     // create buffer states counts
     let bufferSize = 2048;
-    let seconds_per_buffer = bufferSize / this.sampleRate!;
-    this.pause_buffer_count = Math.ceil(
-      this.props.args["pause_threshold"] / seconds_per_buffer
-    );
-    this.pause_count = 0;
-    this.stage = "start";
-
+  
     // creates a gain node
     this.volume = this.context.createGain();
-
-    // creates an audio node from teh microphone incoming stream
+  
+    // creates an audio node from the microphone incoming stream
     this.audioInput = this.context.createMediaStreamSource(this.stream);
-
+  
     // Create analyser
     this.analyser = this.context.createAnalyser();
-
+  
     // connect audio input to the analyser
     this.audioInput.connect(this.analyser);
-
-    // connect analyser to the volume control
-    // analyser.connect(volume);
-
+  
     this.recorder = this.context.createScriptProcessor(bufferSize, 2, 2);
-
-    // we connect the volume control to the processor
-    // volume.connect(recorder);
-
+  
     this.analyser.connect(this.recorder);
-
+  
     // finally connect the processor to the output
     this.recorder.connect(this.context.destination);
-
+  
     const self = this;  // to reference component from inside the function
     this.recorder.onaudioprocess = function (e: any) {
       // Check
@@ -188,61 +213,27 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       // Do something with the data, i.e Convert this to WAV
       let left = e.inputBuffer.getChannelData(0);
       let right = e.inputBuffer.getChannelData(1);
-      if (!self.tested) {
-        self.tested = true;
-        // if this reduces to 0 we are not getting any sound
-        if (!left.reduce((a: number, b: number) => a + b)) {
-          console.log("Error: There seems to be an issue with your Mic");
-          // clean up;
-          self.stop();
-          self.stream!.getTracks().forEach(function (track: any) {
-            track.stop();
-          });
-          self.context.close();
-        }
-      }
-      // Check energy level
-      let energy = Math.sqrt(
-        left.map((x: number) => x * x).reduce((a: number, b: number) => a + b) / left.length
-      );
-      if (self.stage === "start" && energy > self.props.args["start_threshold"]) {
-        self.stage = "speaking";
-      } else if (self.stage === "speaking") {
-        if (energy > self.props.args["end_threshold"]) {
-          self.pause_count = 0;
-        } else {
-          self.pause_count += 1;
-          if (self.pause_count > self.pause_buffer_count!) {
-            self.stop();
-          }
-        }
-      }
-      // let radius = 33.0 + Math.sqrt(1000.0 * energy);
-      // this.props.setRadius(radius.toString());
-
+  
       // we clone the samples
       self.leftchannel.push(new Float32Array(left));
       self.rightchannel.push(new Float32Array(right));
       self.recordingLength += bufferSize;
     };
-    // this.visualize();
   };
 
   start = async () => {
-    console.log("Starting recording, previous state", this.recording);
     this.recording = true;
     this.setState({
-      color: this.props.args["recording_color"]
+      color: this.props.args["recording_color"],
+      status: "recording..."
     })
     await this.setupMic();
     // reset the buffers for the new recording
     this.leftchannel.length = this.rightchannel.length = 0;
     this.recordingLength = 0;    
-    console.log("Started recording, new state", this.recording);
   };
 
   stop = async () => {
-    console.log("Stopping recording, previous state", this.recording);
     this.recording = false;
     this.setState({
       color: this.props.args["neutral_color"]
@@ -304,13 +295,50 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       url: audioUrl,
       type: this.type,
     });
-    console.log("Stopped recording, new state", this.recording);
+
+  };
+
+  
+  private onClicked = async () => {
+    // Debounce time in milliseconds
+    const debounceTime = 1000;
+    
+    // Current time
+    const now = Date.now();
+    
+    // If time since last click is less than debounceTime, ignore the click
+    if (now - this.lastClick < debounceTime) {
+      return;
+    }
+    
+    // Update last click time
+    this.lastClick = now;
+  
+    console.log("Clicked")
+    if (!this.recording){
+      await this.start()
+    } else {
+      await this.stop()
+    }
+  }
+  
+  private onStop = async (data: AudioData) => {
+    // make microphone yellow
+    this.setState({
+      color: "#FFD700",
+      status: "transcribing..."
+    })
+    var transcript = await transcribeAudio(data);
+    console.log(transcript);
+    Streamlit.setComponentValue(transcript);
+    this.setState({
+      color: this.props.args["neutral_color"],
+      status: ""
+    })
   };
 
   public render = (): ReactNode => {
     const { theme } = this.props
-    const text = this.props.args["text"]
-
     if (theme) {
       // Maintain compatibility with older versions of Streamlit that don't send
       // a theme object.
@@ -318,7 +346,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
     return (
       <span>
-        {text} &nbsp;
         <FontAwesomeIcon
         // @ts-ignore
         icon={this.props.args["icon_name"]}
@@ -326,29 +353,11 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
         style={{color:this.state.color}}
         size={this.props.args["icon_size"]}
         />
+        <br/>
+        &nbsp; {this.state.status}
       </span>
     )
   }
-
-  private onClicked = async () => {
-    console.log("Clicked")
-    if (!this.recording){
-      await this.start()
-    } else {
-      await this.stop()
-    }
-
-  }
-    
-  private onStop = async (data: AudioData) => {
-    var buffer = await data.blob.arrayBuffer();
-  
-    // Transcribe audio to text
-    var transcript = await transcribeAudio(new Buffer(buffer));
-    Streamlit.setComponentValue(transcript);
-  }
-
-} 
-  
+}
 
 export default withStreamlitConnection(AudioRecorder)
