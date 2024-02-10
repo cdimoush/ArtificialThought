@@ -24,15 +24,21 @@ from langchain_core.output_parsers import StrOutputParser
 # athought modules
 from _assemblyai_module.__init__ import audio_recorder
 from _llm_module.summary_chain import LabelChain, CleanUpChain, SummaryChain 
+from _pinecone_module.pinecone_upload_client import PineconeUploadClient
 
 ROLE_MAP = {
     'human': 'user',
     'ai': 'assistant'
 }
 
+
+# Chains
 label_chain = LabelChain()
 cleanup_chain = CleanUpChain()
 summary_chain = SummaryChain()
+
+# Pinecone
+pinecone_client = PineconeUploadClient('athought-trainer')
 
 # import audrecorder_streamlit
 st.title('Artifical Thought Experiment')
@@ -50,10 +56,10 @@ if 'initial_state' not in st.session_state:
     st.session_state.memory_cache.chat_memory.add_ai_message("""
         Hello human, welcome to artificial thought experiment....
                 
-        Don't get hung up on experiment. Think of it as an experience gifted to us by the grace of Conner Dimoush. 
+        Don't get hung up on experiment. Think of it as an experience gifted to us by the grace and love of Conner Dimoush. 
                 
         We will be exploring the phenomenon of inefficiency of communication. Whether it be verbal human to human dialogue or an internal monologue,
-        it can be observed that quanity of words scale autrociously with the complexity of the subject matter.
+        it can be observed that quantity of words scale atrociously with the complexity of the subject matter.
 
         This doesn't have to be the case. You'll see why shortly.
                 
@@ -145,6 +151,11 @@ def main():
             if st.session_state['summary']:
                 with st.chat_message("assistant"):
                     st.write(f"Great! Now that we have a summary, let's move on to the next phase.")
+
+                # Upload the summary to Pinecone
+                if 'uploaded' not in st.session_state:
+                    pinecone_client.upload([st.session_state['summary']])
+                    st.session_state['uploaded'] = True
 
                 if st.button('Continue?'):
                     # Clear the chat history

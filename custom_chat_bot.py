@@ -65,7 +65,6 @@ if query := st.chat_input("What is up?"):
     with st.chat_message("user"):
         st.markdown(query)
 
-    # TODO: Add history to the prompt
     prompt = ChatPromptTemplate(messages=[
         SystemMessagePromptTemplate.from_template(role),
         MessagesPlaceholder(variable_name="history"),
@@ -95,8 +94,6 @@ if query := st.chat_input("What is up?"):
 
     assistant_response = asyncio.run(write_stream())
 
-    # TODO: Save new message history
+    # Save new message history
     st.session_state.memory_cache.chat_memory.add_user_message(query)
     st.session_state.memory_cache.chat_memory.add_ai_message(assistant_response)
-    # DEBUG
-    print(st.session_state.memory_cache.load_memory_variables({})['history'])
