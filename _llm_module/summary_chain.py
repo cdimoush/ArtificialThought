@@ -6,6 +6,10 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     PromptTemplate
 )
+
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain_core.output_parsers import StrOutputParser
+
 from operator import itemgetter
 
 from langchain.output_parsers import StructuredOutputParser, CommaSeparatedListOutputParser, PydanticOutputParser, CommaSeparatedListOutputParser
@@ -196,6 +200,9 @@ class SummaryChain:
             Keep in mind that the transcription may not be concise or struggle to properly articulate idea. This
             is the crux of you task. Interpret the messages intent without introducing new ideas. Interpret and 
             concolidate.
+
+            FOR THE SAKE OF THE USER, PLEASE ATTEMPT TO MAINTAIN SOME OF THE USERS TONE AND STYLE. KEEP IT IN THE VOICE
+            OF THE USER. IF FIRST PERSON, KEEP IT FIRST PERSON. IF FIRST PERSON, KEEP IT FIRST PERSON.
         """
 
         self.query = "Labels: {labels}\n Transcription: {transcript}"
@@ -205,10 +212,14 @@ class SummaryChain:
                     HumanMessagePromptTemplate.from_template(self.query)
                 ])
 
-        self.model = ChatOpenAI(model="gpt-4")
+        self.model = ChatOpenAI(
+            model="gpt-4",
+            streaming=True, 
+            callbacks=[StreamingStdOutCallbackHandler()]
+        )
 
-        self.final_chain = self.prompt | self.model
+        self.chain = self.prompt | self.model | StrOutputParser()
 
     def invoke(self, input_dict):
-        return self.final_chain.invoke(input_dict).content
+        return self.chain.invoke(input_dict)
     
