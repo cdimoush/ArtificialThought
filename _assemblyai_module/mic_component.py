@@ -4,8 +4,8 @@ from typing import Optional
 
 import streamlit.components.v1 as components
 
-_RELEASE = False
-_TEST = True
+_RELEASE = True
+_TEST = False
 
 if _RELEASE:
     parent_dir = os.path.dirname(os.path.abspath(__file__))

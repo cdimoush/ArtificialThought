@@ -29,6 +29,11 @@ interface AudioData {
   type: string
 }
 
+interface TranscriptChunk {
+  id: number;
+  transcript: string | null;
+}
+
 interface AudioRecorderProps {
   args: Map<string, any>
   width: number
@@ -37,7 +42,7 @@ interface AudioRecorderProps {
 
 async function uploadAudio(data: AudioData): Promise<string | null> {
   let audioUrl = null;
-  const maxRetries = 3;
+  const maxRetries = 2;
   let attempt = 0;
 
   while (attempt < maxRetries) {
@@ -74,7 +79,7 @@ async function uploadAudio(data: AudioData): Promise<string | null> {
 
 async function transcribeAudio(url: string): Promise<string | null> {
   let transcriptText = null;
-  const maxRetries = 3;
+  const maxRetries = 2;
   let attempt = 0;
 
   while (attempt < maxRetries) {
@@ -134,9 +139,11 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
   // Properties for audio chunking
   transcript: string = ""; // Holds the ongoing transcript
-  chunkLength: number = 4000; // Length of each chunk in milliseconds
+  chunkLength: number = 12000; // Length of each chunk in milliseconds
   currentChunkStartTime: number | null = null; // Start time of the current chunk
   chunksInProcessing: number = 0; // Number of chunks currently being processed
+  chunkArray: TranscriptChunk[] = [];
+  nextChunkId: number = 0;
 
   // Click debounce
   private lastClick = Date.now();
@@ -380,11 +387,8 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   }
 
   private handleChunk = async () => {
-    //// ADD TO CHUNK COUNTER ////
     this.chunksInProcessing++;
-    //// PROCESS CHUNK AUDIO////
     const chunk = this.createChunk();
-    //// UPLOAD CHUNK AUDIO////
     let chunkUrl = await uploadAudio(chunk);
     if (chunkUrl === null) {
       this.setState({
@@ -392,22 +396,22 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       })
       return;
     }
-    //// TRANSCRIBE CHUNK AUDIO////
     let chunkTranscription = await transcribeAudio(chunkUrl);
-    if (chunkTranscription === null) {
-      this.setState({
-        status: "Chunk transcription failed"
-      })
-      return;
-    }
-      //// UPDATE GLOBAL TRANSCRIPT ////
-    this.transcript += chunkTranscription + " "; // Append new transcription with a space for readability
-    //// UPDATE STATE ////
+    // Assign an ID to the chunk and add it to the chunks array
+    this.chunkArray.push({ id: this.nextChunkId++, transcript: chunkTranscription });
+    this.updateTranscript(); // Call the new method to update the transcript
+    this.chunksInProcessing--;
+  };
+
+  private updateTranscript = () => {
+    // Sort chunks by their ID to ensure correct order
+    this.chunkArray.sort((a, b) => a.id - b.id);
+    // Build the transcript from the sorted chunks
+    this.transcript = this.chunkArray.map(chunk => chunk.transcript).join(" ");
+    // Update the component state to reflect the new transcript
     this.setState({
       status: this.status_msg + " " + this.transcript
-    })
-    //// DECREMENT CHUNK COUNTER ////
-    this.chunksInProcessing--;
+    });
   };
 
   public render = (): ReactNode => {
