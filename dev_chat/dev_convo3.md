@@ -1,3 +1,27 @@
+## Chat History
+### human
+To speed up the audio processing in your application, you should divide the audio into chunks and upload each chunk while the next one is being recorded. This involves tracking the duration of the current audio chunk, creating a new chunk when the duration reaches a certain length, and starting the recording of the next chunk immediately. You'll also need to manage multiple chunks and modify your stop function to stop the recording of the current chunk, upload it, and then stop the overall recording process.
+
+
+Remember, these changes involve asynchronous operations and careful timing, so they can be quite complex. It's important to design and test each step carefully.To implement the chunking and parallel uploading, you'll need to modify your existing functions and potentially add new ones. Here's a high-level overview of the changes:
+
+1. **Tracking Duration**: You'll need to track the duration of the current audio chunk. This can be done by adding a timestamp when the recording starts and then checking the elapsed time in your `onaudioprocess` function. Once the duration of a chunk reaches your desired length (e.g., 5 seconds), you can trigger the next steps.
+
+2. **Creating Audio Chunks**: You'll need to modify your `onaudioprocess` function to create audio chunks. Currently, it appends all audio data to `leftchannel` and `rightchannel`. Instead, you should create a new chunk (i.e., a new pair of channels) every time the duration reaches your chunk length. 
+
+3. **Uploading Chunks**: When a chunk is ready, you should call a new function, say `uploadChunk`, which will handle the encoding and uploading of that chunk. This function will be similar to your existing `stop` function, but it will work on a single chunk instead of the entire recording. 
+
+4. **Starting New Chunks**: After a chunk is sent for uploading, you should start recording the next chunk immediately. This means starting a new pair of channels and a new timestamp.
+
+5. **Managing Chunks**: You'll need to manage multiple chunks, each with its own channels, timestamp, and potentially its own `MediaStream` and `ScriptProcessorNode`. This could be done by creating a new class or interface representing a chunk, or by using data structures like arrays or maps.
+
+6. **Stopping the Recording**: Your `stop` function will need to be modified to stop the recording of the current chunk, upload it, and then stop the overall recording process.
+
+Remember, these changes involve asynchronous operations and careful timing, so they can be quite complex. It's important to design and test each step carefully.
+
+Here is the original code:
+
+```typescript
 import { library } from '@fortawesome/fontawesome-svg-core';
 import { fas } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -74,7 +98,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     this.state = { color: this.props.args["neutral_color"], status: ""}
   }
 
-
   stream: MediaStream | null = null;
   // AudioContext = window.AudioContext || window.webkitAudioContext;
   AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -96,14 +119,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   rightBuffer: Float32Array | null = null;
   recordingLength: number = 0;
   tested: boolean = false;
-
-  // Properties for audio chunking
-  chunkLength: number = 5000; // Length of each chunk in milliseconds
-  chunks: AudioData[] = []; // Array to hold audio chunks
-  currentChunkStartTime: number | null = null; // Start time of the current chunk
-  urlArray: string[] = []; // Array to hold URLs of uploaded audio chunks
-
-
 
   // Click debounce
   private lastClick = Date.now();
@@ -213,20 +228,7 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       self.leftchannel.push(new Float32Array(left));
       self.rightchannel.push(new Float32Array(right));
       self.recordingLength += bufferSize;
-
-      // Check if the current chunk has reached the desired length
-      if (Date.now() - self.currentChunkStartTime! >= self.chunkLength) {
-        // Create a new chunk
-        console.log('calling createChunk()');
-        self.createChunk();
-
-        // Start a new chunk
-        self.currentChunkStartTime = Date.now();
-      }
     };
-
-    // Initialize the current chunk start time
-    this.currentChunkStartTime = Date.now();
   };
 
   start = async () => {
@@ -306,72 +308,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
   };
 
-  // Add a new method to create chunks
-  createChunk = () => {
-  // We flat the left and right channels down
-    this.leftBuffer = this.mergeBuffers(this.leftchannel, this.recordingLength);
-    this.rightBuffer = this.mergeBuffers(
-      this.rightchannel,
-      this.recordingLength
-    );
-    // we interleave both channels together
-    let interleaved = this.interleave(this.leftBuffer, this.rightBuffer);
-
-    ///////////// WAV Encode /////////////////
-    // from http://typedarray.org/from-microphone-to-wav-with-getusermedia-and-web-audio/
-    //
-
-    // we create our wav file
-    let buffer = new ArrayBuffer(44 + interleaved.length * 2);
-    let view = new DataView(buffer);
-
-    // RIFF chunk descriptor
-    this.writeUTFBytes(view, 0, "RIFF");
-    view.setUint32(4, 44 + interleaved.length * 2, true);
-    this.writeUTFBytes(view, 8, "WAVE");
-    // FMT sub-chunk
-    this.writeUTFBytes(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    // stereo (2 channels)
-    view.setUint16(22, 2, true);
-    view.setUint32(24, this.sampleRate!, true);
-    view.setUint32(28, this.sampleRate! * 4, true);
-    view.setUint16(32, 4, true);
-    view.setUint16(34, 16, true);
-    // data sub-chunk
-    this.writeUTFBytes(view, 36, "data");
-    view.setUint32(40, interleaved.length * 2, true);
-
-    // write the PCM samples
-    let lng = interleaved.length;
-    let index = 44;
-    let volume = 1;
-    for (let i = 0; i < lng; i++) {
-      view.setInt16(index, interleaved[i] * (0x7fff * volume), true);
-      index += 2;
-    }
-
-    // our final binary blob
-    const blob = new Blob([view], { type: this.type });
-    const audioUrl = URL.createObjectURL(blob);
-
-    // Create an audioData object for the chunk
-    const chunk = {
-      blob: blob,
-      url: audioUrl,
-      type: this.type
-    };
-    // Upload the chunk asynchronously
-    this.uploadChunk(chunk).catch(error => {
-      console.error('Error uploading chunk:', error);
-    });
-
-    // Reset the buffers for the new chunk
-    this.leftchannel.length = this.rightchannel.length = 0;
-    this.recordingLength = 0;
-  };
-
   
   private onClicked = async () => {
     // Debounce time in milliseconds
@@ -411,19 +347,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     })
   };
 
-  // Add a new method to upload chunks
-  uploadChunk = async (chunk: AudioData) => {
-    console.log('Uploading chunk');
-    // Upload the chunk
-    let audioUrl = await uploadAudio(chunk);
-
-    this.urlArray.push(audioUrl);
-
-    Streamlit.setComponentValue(this.urlArray);
-
-
-  };
-
   public render = (): ReactNode => {
     const { theme } = this.props
     if (theme) {
@@ -448,3 +371,7 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 }
 
 export default withStreamlitConnection(AudioRecorder)
+```
+
+Start by writting the code for the functions needed to do steps 1, 2, and 3. You are starting by tracking the duration of the audio stream, and queuing the audio chunks for upload. Everything else can wait till later.
+

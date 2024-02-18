@@ -4,7 +4,7 @@ from typing import Optional
 
 import streamlit.components.v1 as components
 
-_RELEASE = True
+_RELEASE = False
 _TEST = False
 
 if _RELEASE:
@@ -96,8 +96,9 @@ if _TEST:
     import streamlit as st
 
     st.subheader("Base audio recorder")
-    transcript = audio_recorder(key="base")
-    if transcript:
-        st.write(transcript)
+    url_array = audio_recorder(key="base")
+    print(url_array)
+    if url_array:
+        st.write(url_array)
 
 

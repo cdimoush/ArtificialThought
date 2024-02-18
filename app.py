@@ -22,7 +22,8 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
 # athought modules
-from _assemblyai_module.__init__ import audio_recorder
+from _assemblyai_module.mic_component import audio_recorder
+from _assemblyai_module.transcriber import transcribe_url, write_transcript_stream
 from _llm_module.summary_chain import LabelChain, CleanUpChain, SummaryChain 
 from _pinecone_module.pinecone_upload_client import PineconeUploadClient
 
@@ -51,7 +52,9 @@ if 'initial_state' not in st.session_state:
     st.session_state['rerender'] = False
     st.session_state['queue_state_change'] = False 
     # Variables and Objects
-    st.transcript = None
+    st.session_state['transcript_url_list'] = []
+    st.session_state['audio_recorder'] = None
+    st.session_state['transcript'] = ''
     st.session_state['memory_cache'] = ConversationBufferMemory(return_messages=True)
     st.session_state.memory_cache.chat_memory.add_ai_message("""
         Hello human, welcome to artificial thought experiment....
@@ -106,8 +109,23 @@ def main():
             st.write("Click on the microphone to record a message. Click on the microphone again to stop recording.")
             container = st.container(border=True)
             with container:
-                st.session_state['transcript'] = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
+                url = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
+                print(url)
         
+        if url:
+            # Check that transcript url is list
+            print(url)
+            if not isinstance(url, list):
+                url = [url]
+            st.session_state['transcript_url_list'].extend(url)
+            print('Calling async function')
+            stream = asyncio.run(write_transcript_stream())
+            if stream: 
+                st.session_state['transcript'] += stream
+
+            message_out = st.write(st.session_state['transcript'])
+
+
         if st.session_state['transcript']:
             with st.chat_message("user"):
                 st.write(st.session_state['transcript'])
