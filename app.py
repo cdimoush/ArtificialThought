@@ -52,8 +52,6 @@ if 'initial_state' not in st.session_state:
     st.session_state['rerender'] = False
     st.session_state['queue_state_change'] = False 
     # Variables and Objects
-    st.session_state['transcript_url_list'] = []
-    st.session_state['audio_recorder'] = None
     st.session_state['transcript'] = ''
     st.session_state['memory_cache'] = ConversationBufferMemory(return_messages=True)
     st.session_state.memory_cache.chat_memory.add_ai_message("""
@@ -102,36 +100,22 @@ def main():
             with st.chat_message(ROLE_MAP[message.type]):
                 st.markdown(message.content)
 
-
     # Audio State
     if st.session_state['audio_state'] and not st.session_state['rerender']:
+        # TRANSCRIPTION FROM FRONT END
         with st.chat_message("recorder", avatar="🎤"):
             st.write("Click on the microphone to record a message. Click on the microphone again to stop recording.")
             container = st.container(border=True)
             with container:
-                url = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
-                print(url)
+                transcript = audio_recorder(text='', icon_size='5x', key='main_mic') # Returns audio in bytes (audio/wav)
+                if transcript:
+                    st.session_state['transcript'] = transcript
+                    print(transcript)
+
+        # CODE TO DECIDE TO SWITCH TO AI STATE
+        # .....................................
+
         
-        if url:
-            # Check that transcript url is list
-            print(url)
-            if not isinstance(url, list):
-                url = [url]
-            st.session_state['transcript_url_list'].extend(url)
-            print('Calling async function')
-            stream = asyncio.run(write_transcript_stream())
-            if stream: 
-                st.session_state['transcript'] += stream
-
-            message_out = st.write(st.session_state['transcript'])
-
-
-        if st.session_state['transcript']:
-            with st.chat_message("user"):
-                st.write(st.session_state['transcript'])
-            # with st.chat_message("assistant"):
-            #     st.write("Looks like some audio was captured. If you're happy with the recording, click the button below to continue.")
-            st.button('Save Audio', on_click=save_audio)
 
     # Get new user input
     if st.session_state['ai_state'] and not st.session_state['rerender']:

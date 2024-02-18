@@ -5,7 +5,7 @@ from typing import Optional
 import streamlit.components.v1 as components
 
 _RELEASE = False
-_TEST = False
+_TEST = True
 
 if _RELEASE:
     parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +19,18 @@ else:
         url="http://localhost:3001",
     )
 
+
+#############################################################
+##########NOTE###############################################
+#################### TO #####################################
+######################### SELF ##############################
+#############################################################
+#############################################################
+#############################################################
+
+# I Both simplified and complicated the frontend mic component from the original source code.
+# Simplified, removing energy and pause thresholds... Makesure it is all removed
+# Complicated, front end assemblyapi calls and chuncking.
 
 def audio_recorder(
     text: str = "Click to record",

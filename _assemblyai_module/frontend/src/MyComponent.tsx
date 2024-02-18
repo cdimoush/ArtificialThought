@@ -9,7 +9,6 @@ import {
 } from "streamlit-component-lib";
 import { AssemblyAI } from 'assemblyai';
 
-
 library.add(fas)
 
 // BAD IDEA BAD IDEA BAD IDEA, FIX LATER
@@ -36,36 +35,70 @@ interface AudioRecorderProps {
   disabled: boolean
 }
 
-async function uploadAudio(data: AudioData): Promise<string> {
-  // Function to upload audio to AssemblyAI, returns the url for the audio 
-  let audioUrl = '';
+async function uploadAudio(data: AudioData): Promise<string | null> {
+  let audioUrl = null;
+  const maxRetries = 3;
+  let attempt = 0;
 
-  try {
-    // Prepare the request options including the API key for AssemblyAI
-    const requestOptions = {
-      method: 'POST',
-      headers: {
-        'Authorization': apiKey,
-        'Content-Type': 'application/octet-stream',
-      },
-      body: data.blob,
-    };
+  while (attempt < maxRetries) {
+    try {
+      const requestOptions = {
+        method: 'POST',
+        headers: {
+          'Authorization': apiKey,
+          'Content-Type': 'application/octet-stream',
+        },
+        body: data.blob,
+      };
 
-    // Perform the upload to AssemblyAI
-    const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', requestOptions);
-    const uploadResult = await uploadResponse.json();
+      const uploadResponse = await fetch('https://api.assemblyai.com/v2/upload', requestOptions);
+      const uploadResult = await uploadResponse.json();
 
-    if (uploadResponse.ok) {
-      audioUrl = uploadResult.upload_url;
-      return audioUrl;
+      if (uploadResponse.ok) {
+        audioUrl = uploadResult.upload_url;
+        return audioUrl;
+      } else {
+        throw new Error('Audio upload failed: ' + uploadResult.error);
+      }
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      if (attempt === maxRetries - 1) {
+        return null; // Return null after all attempts fail
+      }
     }
-    else {
-      throw new Error('Audio upload failed: ' + uploadResult.error);
-    }
-  } catch (error) {
-    console.error(error);
-    return 'An error occurred while uploading the audio: ';
+    attempt++;
   }
+
+  return audioUrl;
+}
+
+async function transcribeAudio(url: string): Promise<string | null> {
+  let transcriptText = null;
+  const maxRetries = 3;
+  let attempt = 0;
+
+  while (attempt < maxRetries) {
+    try {
+      let transcript = await client.transcripts.transcribe({
+        audio: url,
+      });
+
+      if (transcript.status === 'completed') {
+        transcriptText = transcript.text as string;
+        return transcriptText;
+      } else {
+        throw new Error('Transcription failed: ' + transcript.status);
+      }
+    } catch (error) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      if (attempt === maxRetries - 1) {
+        return null; // Return null after all attempts fail
+      }
+    }
+    attempt++;
+  }
+
+  return transcriptText;
 }
 
 class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
@@ -98,12 +131,9 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   tested: boolean = false;
 
   // Properties for audio chunking
-  chunkLength: number = 5000; // Length of each chunk in milliseconds
-  chunks: AudioData[] = []; // Array to hold audio chunks
+  transcript: string = ""; // Holds the ongoing transcript
+  chunkLength: number = 7500; // Length of each chunk in milliseconds
   currentChunkStartTime: number | null = null; // Start time of the current chunk
-  urlArray: string[] = []; // Array to hold URLs of uploaded audio chunks
-
-
 
   // Click debounce
   private lastClick = Date.now();
@@ -177,30 +207,23 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       );
       this.sampleRate = input_sample_rate;
     }
+
     console.log(`Sample rate ${this.sampleRate}Hz`);
   
     // create buffer states counts
     let bufferSize = 2048;
-  
     // creates a gain node
     this.volume = this.context.createGain();
-  
     // creates an audio node from the microphone incoming stream
     this.audioInput = this.context.createMediaStreamSource(this.stream);
-  
     // Create analyser
     this.analyser = this.context.createAnalyser();
-  
     // connect audio input to the analyser
-    this.audioInput.connect(this.analyser);
-  
+    this.audioInput.connect(this.analyser);  
     this.recorder = this.context.createScriptProcessor(bufferSize, 2, 2);
-  
     this.analyser.connect(this.recorder);
-  
     // finally connect the processor to the output
     this.recorder.connect(this.context.destination);
-  
     const self = this;  // to reference component from inside the function
     this.recorder.onaudioprocess = function (e: any) {
       // Check
@@ -208,20 +231,16 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       // Do something with the data, i.e Convert this to WAV
       let left = e.inputBuffer.getChannelData(0);
       let right = e.inputBuffer.getChannelData(1);
-  
       // we clone the samples
       self.leftchannel.push(new Float32Array(left));
       self.rightchannel.push(new Float32Array(right));
       self.recordingLength += bufferSize;
-
       // Check if the current chunk has reached the desired length
       if (Date.now() - self.currentChunkStartTime! >= self.chunkLength) {
-        // Create a new chunk
-        console.log('calling createChunk()');
-        self.createChunk();
-
-        // Start a new chunk
+        // Start timer of the next chunk
         self.currentChunkStartTime = Date.now();
+        // Process the current chunk
+        self.handleChunk();
       }
     };
 
@@ -231,6 +250,7 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
   start = async () => {
     this.recording = true;
+    this.transcript = ""; // Reset the transcript at the start of a new recording
     this.setState({
       color: this.props.args["recording_color"],
       status: "recording..."
@@ -307,7 +327,7 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   };
 
   // Add a new method to create chunks
-  createChunk = () => {
+  private createChunk = (): AudioData => {
   // We flat the left and right channels down
     this.leftBuffer = this.mergeBuffers(this.leftchannel, this.recordingLength);
     this.rightBuffer = this.mergeBuffers(
@@ -354,48 +374,41 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
     // our final binary blob
     const blob = new Blob([view], { type: this.type });
-    const audioUrl = URL.createObjectURL(blob);
 
     // Create an audioData object for the chunk
-    const chunk = {
+    const chunk: AudioData = {
       blob: blob,
-      url: audioUrl,
+      url: URL.createObjectURL(blob),
       type: this.type
     };
-    // Upload the chunk asynchronously
-    this.uploadChunk(chunk).catch(error => {
-      console.error('Error uploading chunk:', error);
-    });
 
     // Reset the buffers for the new chunk
     this.leftchannel.length = this.rightchannel.length = 0;
     this.recordingLength = 0;
+
+    return chunk;
   };
 
   
   private onClicked = async () => {
-    // Debounce time in milliseconds
+    //// CLICK DEBOUNCE ////
     const debounceTime = 1000;
-    
     // Current time
     const now = Date.now();
-    
     // If time since last click is less than debounceTime, ignore the click
     if (now - this.lastClick < debounceTime) {
       return;
     }
-    
-    // Update last click time
+
+    //// BUTTON LOGIC ////
     this.lastClick = now;
-  
-    console.log("Clicked")
     if (!this.recording){
       await this.start()
     } else {
       await this.stop()
     }
   }
-  
+
   private onStop = async (data: AudioData) => {
     // make microphone yellow
     this.setState({
@@ -411,17 +424,32 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     })
   };
 
-  // Add a new method to upload chunks
-  uploadChunk = async (chunk: AudioData) => {
-    console.log('Uploading chunk');
-    // Upload the chunk
-    let audioUrl = await uploadAudio(chunk);
+  private handleChunk = async () => {
+    //// PROCESS CHUNK AUDIO////
+    const chunk = this.createChunk();
+    //// UPLOAD CHUNK AUDIO////
+    let chunkUrl = await uploadAudio(chunk);
+    if (chunkUrl === null) {
+      this.setState({
+        status: "Chunk upload failed"
+      })
+      return;
+    }
+    //// TRANSCRIBE CHUNK AUDIO////
+    let chunkTranscription = await transcribeAudio(chunkUrl);
+    if (chunkTranscription === null) {
+      this.setState({
+        status: "Chunk transcription failed"
+      })
+      return;
+    }
+      //// UPDATE GLOBAL TRANSCRIPT ////
+    this.transcript += chunkTranscription + " "; // Append new transcription with a space for readability
 
-    this.urlArray.push(audioUrl);
-
-    Streamlit.setComponentValue(this.urlArray);
-
-
+    //// UPDATE STATE ////
+    this.setState({
+      status: this.transcript
+    })
   };
 
   public render = (): ReactNode => {
@@ -430,7 +458,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       // Maintain compatibility with older versions of Streamlit that don't send
       // a theme object.
     }
-
     return (
       <span>
         <FontAwesomeIcon
