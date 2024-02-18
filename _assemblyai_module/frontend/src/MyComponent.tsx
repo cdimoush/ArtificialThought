@@ -107,7 +107,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     this.state = { color: this.props.args["neutral_color"], status: ""}
   }
 
-
   stream: MediaStream | null = null;
   // AudioContext = window.AudioContext || window.webkitAudioContext;
   AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -130,10 +129,14 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   recordingLength: number = 0;
   tested: boolean = false;
 
+  // Custom properties
+  status_msg: string = ""; // Status message to be displayed 
+
   // Properties for audio chunking
   transcript: string = ""; // Holds the ongoing transcript
-  chunkLength: number = 7500; // Length of each chunk in milliseconds
+  chunkLength: number = 4000; // Length of each chunk in milliseconds
   currentChunkStartTime: number | null = null; // Start time of the current chunk
+  chunksInProcessing: number = 0; // Number of chunks currently being processed
 
   // Click debounce
   private lastClick = Date.now();
@@ -207,7 +210,7 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       );
       this.sampleRate = input_sample_rate;
     }
-
+  
     console.log(`Sample rate ${this.sampleRate}Hz`);
   
     // create buffer states counts
@@ -237,13 +240,16 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       self.recordingLength += bufferSize;
       // Check if the current chunk has reached the desired length
       if (Date.now() - self.currentChunkStartTime! >= self.chunkLength) {
+        // Process the current chunk without stopping the recording
+        self.handleChunk();
+        // Reset the buffers for the new chunk
+        self.leftchannel.length = self.rightchannel.length = 0;
+        self.recordingLength = 0;
         // Start timer of the next chunk
         self.currentChunkStartTime = Date.now();
-        // Process the current chunk
-        self.handleChunk();
       }
     };
-
+  
     // Initialize the current chunk start time
     this.currentChunkStartTime = Date.now();
   };
@@ -251,9 +257,10 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
   start = async () => {
     this.recording = true;
     this.transcript = ""; // Reset the transcript at the start of a new recording
+    this.status_msg = "[Recording...]";
     this.setState({
       color: this.props.args["recording_color"],
-      status: "recording..."
+      status: this.status_msg
     })
     await this.setupMic();
     // reset the buffers for the new recording
@@ -263,72 +270,43 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
 
   stop = async () => {
     this.recording = false;
+
+    this.status_msg = "[Processing...]";
     this.setState({
-      color: this.props.args["neutral_color"]
-    })
+      color: '#FFD700',
+      status: this.status_msg + " " + this.transcript
+    });
+    
+    // Call handleChunk for the last chunk processing
+    this.handleChunk();
+  
+    // Wait for the chunkProcessingComplete flag to be set to true
+    await new Promise<void>(resolve => {
+      const checkProcessing = () => {
+        if (this.chunksInProcessing === 0) {
+          resolve();
+        } else {
+          // Check the flag every 100 milliseconds
+          setTimeout(checkProcessing, 100);
+        }
+      };
+      checkProcessing();
+    });
+  
+    // Proceed to stop the microphone and update the UI
     this.closeMic();
-    console.log(this.recordingLength);
 
-    // we flat the left and right channels down
-    this.leftBuffer = this.mergeBuffers(this.leftchannel, this.recordingLength);
-    this.rightBuffer = this.mergeBuffers(
-      this.rightchannel,
-      this.recordingLength
-    );
-    // we interleave both channels together
-    let interleaved = this.interleave(this.leftBuffer, this.rightBuffer);
-
-    ///////////// WAV Encode /////////////////
-    // from http://typedarray.org/from-microphone-to-wav-with-getusermedia-and-web-audio/
-    //
-
-    // we create our wav file
-    let buffer = new ArrayBuffer(44 + interleaved.length * 2);
-    let view = new DataView(buffer);
-
-    // RIFF chunk descriptor
-    this.writeUTFBytes(view, 0, "RIFF");
-    view.setUint32(4, 44 + interleaved.length * 2, true);
-    this.writeUTFBytes(view, 8, "WAVE");
-    // FMT sub-chunk
-    this.writeUTFBytes(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    // stereo (2 channels)
-    view.setUint16(22, 2, true);
-    view.setUint32(24, this.sampleRate!, true);
-    view.setUint32(28, this.sampleRate! * 4, true);
-    view.setUint16(32, 4, true);
-    view.setUint16(34, 16, true);
-    // data sub-chunk
-    this.writeUTFBytes(view, 36, "data");
-    view.setUint32(40, interleaved.length * 2, true);
-
-    // write the PCM samples
-    let lng = interleaved.length;
-    let index = 44;
-    let volume = 1;
-    for (let i = 0; i < lng; i++) {
-      view.setInt16(index, interleaved[i] * (0x7fff * volume), true);
-      index += 2;
-    }
-
-    // our final binary blob
-    const blob = new Blob([view], { type: this.type });
-    const audioUrl = URL.createObjectURL(blob);
-
-
-    await this.onStop({
-      blob: blob,
-      url: audioUrl,
-      type: this.type,
+    this.status_msg = "[Recording Complete]";
+    this.setState({
+      color: '#00FF00', // Green
+      status: this.status_msg + " " + this.transcript
     });
 
+    Streamlit.setComponentValue(this.transcript);
   };
 
-  // Add a new method to create chunks
   private createChunk = (): AudioData => {
-  // We flat the left and right channels down
+    // We flat the left and right channels down
     this.leftBuffer = this.mergeBuffers(this.leftchannel, this.recordingLength);
     this.rightBuffer = this.mergeBuffers(
       this.rightchannel,
@@ -338,9 +316,6 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     let interleaved = this.interleave(this.leftBuffer, this.rightBuffer);
 
     ///////////// WAV Encode /////////////////
-    // from http://typedarray.org/from-microphone-to-wav-with-getusermedia-and-web-audio/
-    //
-
     // we create our wav file
     let buffer = new ArrayBuffer(44 + interleaved.length * 2);
     let view = new DataView(buffer);
@@ -382,13 +357,8 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
       type: this.type
     };
 
-    // Reset the buffers for the new chunk
-    this.leftchannel.length = this.rightchannel.length = 0;
-    this.recordingLength = 0;
-
     return chunk;
   };
-
   
   private onClicked = async () => {
     //// CLICK DEBOUNCE ////
@@ -409,22 +379,9 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     }
   }
 
-  private onStop = async (data: AudioData) => {
-    // make microphone yellow
-    this.setState({
-      color: "#FFD700",
-      status: "transcribing..."
-    })
-    var audioUrl = await uploadAudio(data);
-    console.log(audioUrl);
-    Streamlit.setComponentValue(audioUrl);
-    this.setState({
-      color: this.props.args["neutral_color"],
-      status: ""
-    })
-  };
-
   private handleChunk = async () => {
+    //// ADD TO CHUNK COUNTER ////
+    this.chunksInProcessing++;
     //// PROCESS CHUNK AUDIO////
     const chunk = this.createChunk();
     //// UPLOAD CHUNK AUDIO////
@@ -445,11 +402,12 @@ class AudioRecorder extends StreamlitComponentBase<AudioRecorderState> {
     }
       //// UPDATE GLOBAL TRANSCRIPT ////
     this.transcript += chunkTranscription + " "; // Append new transcription with a space for readability
-
     //// UPDATE STATE ////
     this.setState({
-      status: this.transcript
+      status: this.status_msg + " " + this.transcript
     })
+    //// DECREMENT CHUNK COUNTER ////
+    this.chunksInProcessing--;
   };
 
   public render = (): ReactNode => {
