@@ -150,7 +150,7 @@ class CleanUpChain():
 
 
         # model = ChatOpenAI(model="gpt-3.5-turbo", temperature=0.)
-        model = ChatOpenAI(model="gpt-4", temperature=0.0)
+        model = ChatOpenAI(model="gpt-4-0125-preview", temperature=0.0)
 
         # Update the correction_chain to include the parser
         self.chain = (
@@ -215,7 +215,7 @@ class SummaryChain:
                 ])
 
         self.model = ChatOpenAI(
-            model="gpt-4",
+            model="gpt-4-0125-preview",
             streaming=True, 
             callbacks=[StreamingStdOutCallbackHandler()]
         )

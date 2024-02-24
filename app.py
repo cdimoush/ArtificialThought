@@ -163,7 +163,20 @@ def handle_subsequent_ai_state():
         with st.chat_message("user"):
             st.markdown(query)
 
-        role = 'You are a chat bot designed to talk about ANYTHING. You are friendly and helpful'
+        role = """ 
+            Your receive the summary of audio transcriptions. The original user who spoke 
+            the audio is now speaking with you. You will work with the user and do anything
+            that they say. 
+
+            Keep in mind that you will likely be asked to work with the summary. This work
+            could include but is not limited to:
+            - Rewriting the summary in a new formate that the user desires. This could be style, length, or tone.
+            - Convert the summary into a new format. This could be email, text message, or speech.
+            - Provide additonal information or context that the user did not provide or know at time of recording but would like to include in text.
+        
+            Here is the original summary:
+            {summary}
+        """
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template(role),
             MessagesPlaceholder(variable_name="history"),
@@ -172,7 +185,7 @@ def handle_subsequent_ai_state():
 
         parser = StrOutputParser()
         model = ChatOpenAI(
-            model="gpt-3.5-turbo-16k", 
+            model="gpt-4-0125-preview", 
             streaming=True,
             callbacks=[StreamingStdOutCallbackHandler()]
         )
@@ -190,7 +203,7 @@ def handle_subsequent_ai_state():
 
         async def write_stream():
             assistant_response = ''
-            async for chunk in chain.astream({"query": query}):
+            async for chunk in chain.astream({"query": query, "summary": st.session_state['summary']}):
                 assistant_response += chunk
                 assistant_message.markdown(assistant_response)
 
