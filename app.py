@@ -87,13 +87,27 @@ def display_system_messages():
         st.warning('You have reached the end of current development...')
 
 def handle_chat():
+    from streamlit_extras.bottom_container import bottom
+    with bottom():
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.popover("Options"):
+                role_select = st.selectbox(
+                'Agent Role',
+                ('dry', 'chatty'))
+        with col2:
+            st.write("[MICROPHONE PLACEHOLDER]")
     if query := st.chat_input("What is up?"):
         with st.chat_message("user"):
             st.markdown(query)
 
-        role = """ 
-            You are a chat bot that chats. Except you are not that chatty. You really try stay to the point and finish the conversation.
-        """
+        agent_roles = {
+            "dry": "You are a chat bot that chats. Except you are not that chatty. You really try stay to the point and finish the conversation.",
+            "chatty": "You are a chat bot that chats. You are very chatty and love to keep the conversation going."
+        }
+
+        role = agent_roles[role_select]
+
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template(role),
             MessagesPlaceholder(variable_name="history"),
