@@ -3,7 +3,6 @@ from operator import itemgetter
 import asyncio
 # Third-party libraries
 import streamlit as st
-from streamlit_extras.bottom_container import bottom
 # LangChain Modules
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
@@ -87,78 +86,62 @@ def display_system_messages():
     if not st.session_state['initial_state']:
         st.warning('You have reached the end of current development...')
 
-# Display chat options to the user
-def display_chat_options() -> str:
-    with bottom():
-        (col1, col2) = st.columns(2)
-        # Handle chat options (Dropdown)
-        with col1:
-            with st.popover('Options'):
-                role_select = st.selectbox('Agent Role', ('dry', 'chatty'))
-
-        # Handle audio input (Microphone)
-        with col2:
-            st.write('[MICROPHONE PLACEHOLDER]')
-    return role_select
-
-# Process user input from chat
-def process_user_input() -> str:
-    query = st.chat_input('What is up?')
-    if query:
-        with st.chat_message('user'):
-            st.markdown(query)
-    return query
-
-# Generate and display AI response based on user input and selected role
-async def generate_and_display_response(role_select: str, query: str) -> str:
-    # Define the roles and their descriptions to tailor the chatbot's personality
-    agent_roles = {
-        'dry': 'You are a chat bot that chats. Except you are not that chatty. You really try stay to the point and finish the conversation.',
-        'chatty': 'You are a chat bot that chats. You are very chatty and love to keep the conversation going.'
-    }
-    # Select the role based on user choice
-    role = agent_roles[role_select]
-    
-    # Create a prompt template with the selected role, chat history, and the current user query
-    prompt = ChatPromptTemplate(messages=[
-        SystemMessagePromptTemplate.from_template(role),  # System message based on the selected role
-        MessagesPlaceholder(variable_name='history'),  # Placeholder for previous chat history
-        HumanMessagePromptTemplate.from_template('{query}')  # The current user query
-    ])
-    
-    # Initialize the output parser to process the model's response
-    parser = StrOutputParser()
-    
-    # Initialize the chat model with specified configurations
-    model = ChatOpenAI(model='gpt-4-0125-preview', streaming=True, callbacks=[StreamingStdOutCallbackHandler()])
-    
-    # Create a processing chain that loads chat history, applies the prompt, runs the model, and parses the output
-    chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | model | parser
-    
-    # Prepare a placeholder for the assistant's message in the chat interface
-    with st.chat_message('assistant'):
-        assistant_message = st.empty()
-
-    # Initialize a variable to accumulate the assistant's response
-    assistant_response = ''
-    try:
-        # Stream the model's response asynchronously
-        async for chunk in chain.astream({'query': query}):
-            assistant_response += chunk  # Accumulate the response chunks
-            assistant_message.markdown(assistant_response)  # Display the ongoing response in the chat interface
-    except Exception as e:
-        # Handle any errors that occur during the response generation process
-        st.error(f"Error generating response: {e}")
-    
-    # Return the complete assistant response
-    return assistant_response
-
-# Main function to handle chat interaction
 def handle_chat():
-    role_select = display_chat_options()
-    query = process_user_input()
-    if query:
-        assistant_response = asyncio.run(generate_and_display_response(role_select, query))
+    from streamlit_extras.bottom_container import bottom
+    with bottom():
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.popover("Options"):
+                role_select = st.selectbox(
+                'Agent Role',
+                ('dry', 'chatty'))
+        with col2:
+            st.write("[MICROPHONE PLACEHOLDER]")
+    if query := st.chat_input("What is up?"):
+        with st.chat_message("user"):
+            st.markdown(query)
+
+        agent_roles = {
+            "dry": "You are a chat bot that chats. Except you are not that chatty. You really try stay to the point and finish the conversation.",
+            "chatty": "You are a chat bot that chats. You are very chatty and love to keep the conversation going."
+        }
+
+        role = agent_roles[role_select]
+
+        prompt = ChatPromptTemplate(messages=[
+            SystemMessagePromptTemplate.from_template(role),
+            MessagesPlaceholder(variable_name="history"),
+            HumanMessagePromptTemplate.from_template('{query}')
+        ])
+
+        parser = StrOutputParser()
+        model = ChatOpenAI(
+            model="gpt-4-0125-preview", 
+            streaming=True,
+            callbacks=[StreamingStdOutCallbackHandler()]
+        )
+        chain = (
+            RunnablePassthrough.assign(
+                history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter("history")
+            )
+            | prompt
+            | model
+            | parser
+        )
+
+        with st.chat_message("assistant"):
+            assistant_message = st.empty()
+
+        async def write_stream():
+            assistant_response = ''
+            async for chunk in chain.astream({"query": query}):
+                assistant_response += chunk
+                assistant_message.markdown(assistant_response)
+
+            return assistant_response
+
+        assistant_response = asyncio.run(write_stream())
+
         # Save new message history
         st.session_state.memory_cache.chat_memory.add_user_message(query)
         st.session_state.memory_cache.chat_memory.add_ai_message(assistant_response)
