@@ -4,6 +4,13 @@ Convert audio to text to thought. Exploring utilization of LLM to utilize, conde
 
 ---
 # Log
+## 2024-04-07
+The stripped down chat bot wrapper is working. 
+
+Added drop down for selecting parameters and a placeholder to add microphone input back in.
+
+Focus now is finalize the cleanup pass then start building crew-ai plug in. 
+
 ## 2024-03-21
 Ok made the 'artificial thought experiment' app. I want to nuke it now and make a generic chat bot wrapper that I can layer features on top of. I save the current work in a branch called 'artificial_thought_experiment'.
 
