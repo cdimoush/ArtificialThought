@@ -4,7 +4,7 @@ import streamlit as st
 # source imports
 from src.initialization import handle_session_initialization
 from src.ui_component import display_title, display_chat_history, display_system_messages
-from src.chat_component import handle_chat
+from src.chat_interface import handle_chat
 
 # Define main application function
 def main():

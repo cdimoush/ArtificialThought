@@ -1,5 +1,5 @@
 assemblyai==0.20.2
-crewai==0.28.4
+crewai==0.28.6
 langchain==0.1.14
 langchain_core==0.1.40
 langchain-community==0.0.31
