@@ -1,5 +1,6 @@
 import streamlit as st
 from langchain.memory import ConversationBufferMemory
+from src.agents import AgentHandler
 
 def handle_session_initialization():
     """
@@ -9,6 +10,7 @@ def handle_session_initialization():
     if 'initial_state' not in st.session_state:
         st.session_state['rerender'] = False
         st.session_state['memory_cache'] = ConversationBufferMemory(return_messages=True)
+        st.session_state['agent_handler'] = AgentHandler('config/agents.yaml')
         # st.session_state.memory_cache.chat_memory.add_ai_message("""
         #     Hello human, welcome to artificial thought experiment....
                     

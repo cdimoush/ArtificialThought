@@ -1,17 +1,16 @@
 import asyncio
 import streamlit as st
 from streamlit_extras.bottom_container import bottom
-from src.agents import select_agent
 
 def handle_chat_options() -> str:
     with bottom():
         (col1, col2) = st.columns(2)
         with col1:
             with st.popover('Options'):
-                role_select = st.selectbox('Agent Role', ('dry', 'chatty', 'crewai'))
+                selected_agent = st.selectbox('Agent Role', st.session_state.agent_handler.agent_titles)
         with col2:
             st.write('[MICROPHONE PLACEHOLDER]')
-    return role_select
+    return selected_agent
 
 def handle_user_input() -> str:
     query = st.chat_input('What is up?')
@@ -21,10 +20,10 @@ def handle_user_input() -> str:
     return query
 
 def handle_chat():
-    role_select = handle_chat_options()
+    selected_agent = handle_chat_options()
     query = handle_user_input()
     if query:
-        agent = select_agent(role_select)
+        agent = st.session_state.agent_handler.create_new_agent(selected_agent)
         response = asyncio.run(generate_and_display_response(agent, query))
 
         st.session_state.memory_cache.chat_memory.add_user_message(query)
