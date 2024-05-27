@@ -61,16 +61,30 @@ class AgentHandler:
     def __init__(self, config_path):
         self.config_path = config_path
         self._agent_params = self.load_agent_params()
+        self._active_agent = None
 
     @property
     def agent_titles(self):
         return list(self._agent_params.keys())
-    
+
+    @property
+    def active_agent(self):
+        return self._active_agent
+
+    @active_agent.setter
+    def active_agent(self, title):
+        if title in self._agent_params:
+            self._active_agent = self.create_new_agent(title)
+        else:
+            st.error(f"No agent configuration found for: {title}")
+
     def load_agent_params(self):
         with open(self.config_path, 'r') as file:
             config = yaml.safe_load(file)
         return config
 
     def create_new_agent(self, title):
+        if title not in self._agent_params:
+            st.error(f"No agent configuration found for: {title}")
+            return None
         return Agent(title, **self._agent_params[title])
-
