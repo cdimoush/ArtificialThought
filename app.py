@@ -4,7 +4,7 @@ import streamlit as st
 # source imports
 from src.initialization import handle_session_initialization
 from src.ui_component import display_title, display_chat_history, display_system_messages
-from src.chat_interface import handle_chat
+from src.chat_interface import handle_user_input
 
 # Define main application function
 def main():
@@ -17,7 +17,7 @@ def main():
     display_system_messages()
     display_chat_history()
     # Handle chat
-    handle_chat()
+    handle_user_input()
 
 # Function to rerender the page if needed
 def rerender_page_if_needed():
