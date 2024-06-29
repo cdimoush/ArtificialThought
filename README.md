@@ -1,9 +1,17 @@
 Artificial Thought
 ================== 
+NEW APP
+Genesis adoption
+
+OLD APP
 Convert audio to text to thought. Exploring utilization of LLM to utilize, condense, and categorize unstructured data, with the hope of generating new data.
 
 ---
 # Log
+## 2024-06-28
+Add some crazy recursive menu awhile back, starting to dig in again. Working on loading files.
+
+
 ## 2024-04-07
 The stripped down chat bot wrapper is working. 
 
