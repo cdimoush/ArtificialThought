@@ -1,39 +1,14 @@
 import streamlit as st
 from langchain.memory import ConversationBufferMemory
 
+# Local imports
+from src.file_handler import FolderNavigator, FileNavigator
+from src.agents import AgentHandler
+
 def clear_memory_cache():
     st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
     st.success("Memory cache cleared.")
 
-class Menu:
-    def __init__(self, title, options):
-        """
-        Initialize a new Menu instance.
-        :param title: The title of the menu.
-        :param options: A dictionary of options where keys are option texts and values are the action methods or Menu instances for sub-menus.
-        """
-        self.title = title
-        self.options = options
-
-    def display(self):
-        """
-        Display the menu options.
-        """
-        st.markdown(f"**{self.title}**")
-        for idx, option in enumerate(self.options, start=1):
-            st.markdown(f"{idx}. {option}")
-
-    def get_action(self, choice):
-        """
-        Get the action associated with the user's choice.
-        :param choice: The user's choice (1-indexed).
-        :return: The action associated with the choice.
-        """
-        if 1 <= choice <= len(self.options):
-            return list(self.options.values())[choice - 1]
-        else:
-            return None
-        
 class MenuManager:
     def __init__(self, initial_menu):
         """
@@ -80,8 +55,37 @@ class MenuManager:
         else:
             st.warning("You're at the top-level menu. There's no previous menu to go back to.")
 
-class AgentSubMenu(Menu):
-    def __init__(self, handler):
+class Menu:
+    def __init__(self, title, options):
+        """
+        Initialize a new Menu instance.
+        :param title: The title of the menu.
+        :param options: A dictionary of options where keys are option texts and values are the action methods or Menu instances for sub-menus.
+        """
+        self.title = title
+        self.options = options
+
+    def display(self):
+        """
+        Display the menu options.
+        """
+        st.markdown(f"**{self.title}**")
+        for idx, option in enumerate(self.options, start=1):
+            st.markdown(f"{idx}. {option}")
+
+    def get_action(self, choice):
+        """
+        Get the action associated with the user's choice.
+        :param choice: The user's choice (1-indexed).
+        :return: The action associated with the choice.
+        """
+        if 1 <= choice <= len(self.options):
+            return list(self.options.values())[choice - 1]
+        else:
+            return None
+        
+class AgentMenu(Menu):
+    def __init__(self, handler: AgentHandler):
         options = {f"{title}": self.make_select_agent_function(handler, title) for idx, title in enumerate(handler.agent_titles)}
         super().__init__("Select an Agent", options)
 
@@ -92,27 +96,32 @@ class AgentSubMenu(Menu):
             st.success(f"Selected agent: {title}")
         return select_agent
     
-class FileSubMenu(Menu):
-    def __init__(self, handler):
-        # Dynamically generate options based on files in the directory
-        file_names = handler.list_files_in_directory()
-        options = {f"{file_name}": self.make_load_file_function(handler, file_name) for file_name in file_names}
-        super().__init__("Load Reference Code", options)
+class FolderMenu(Menu):
+    def __init__(self, nav: FolderNavigator):
+        """Dynamically generate options based on files in the directory. """
+        file_names = nav.list_contents()
+        options = {f"{name}": self.make_sub_menu(path, folder) for name, path, folder in file_names}
+        super().__init__("Select Directory / File", options)
 
-    def make_load_file_function(self, handler, file_name):
-        """Returns a function that loads the file content into the Streamlit app."""
-        def load_file():
-            file_content = handler.load_file(file_name)
-            if file_content is not None:
-                st.text(file_content)  # Display the file content in Streamlit
-            else:
-                st.error("Failed to load file.")
-        return load_file
+    def make_sub_menu(self, path: str, folder: bool):
+        """ Make sub menus for folder navigation. """
+        if folder:
+            return FolderMenu(FolderNavigator([path]))
+        else:
+            return FileMenu(FileNavigator(path))
+
+class FileMenu(Menu):
+    def __init__(self, nav: FileNavigator):
+        """ Load File...
+        In the future add methods for extracting code from files. 
+        """
+        options = {f"Load {nav.name}": nav.load_file}
+        super().__init__("File Menu", options)
 
 def initialize_menus():
     main_menu_options = {
-        "Select Agent": AgentSubMenu(st.session_state.agent_handler),
-        "Load File": FileSubMenu(st.session_state.file_handler),
+        "Select Agent": AgentMenu(st.session_state.agent_handler),
+        "Load File": FolderMenu(st.session_state.file_handler.get_nav()),
         "Clear Memory Cache": clear_memory_cache,
     }
     main_menu = Menu("Main Menu", main_menu_options)

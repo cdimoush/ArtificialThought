@@ -1,4 +1,5 @@
 import yaml
+import sys
 from langchain_openai import ChatOpenAI
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -39,6 +40,8 @@ class Agent:
         try:
             async for chunk in chain.astream({'query': query}):
                 assistant_response += chunk
+                # Print Chunk in Red
+                print(chunk, file=sys.stderr)
         except Exception as e:
             st.error(f"Error generating response: {e}")
         

@@ -8,7 +8,7 @@ from src.menu import initialize_menu_manager
 ##########   UI  ################
 #################################
 
-def handle_chat_options() -> str:
+def handle_chat_options():
     with bottom():
         (col1, col2) = st.columns(2)
         with col1:
@@ -21,10 +21,14 @@ def handle_chat_options() -> str:
                     st.session_state.agent_handler.active_agent = selected_agent
         with col2:
             st.write('[MICROPHONE PLACEHOLDER]')
-    return selected_agent
 
-def handle_user_input() -> str:
-    selected_agent = handle_chat_options()
+def add_references_to_query(query: str):
+    if st.session_state.file_handler.has_file_content():
+        query = st.session_state.file_handler.write_file_content_to_query() + query
+    return query
+
+def handle_user_input():
+    handle_chat_options()
     query = st.chat_input('Type a message')
     if query:
         if query.startswith('/'): # Toggle between chat and menu mode
@@ -35,21 +39,32 @@ def handle_user_input() -> str:
                 st.session_state.app_mode = APP_MODE.CHAT
         else:
             if st.session_state.app_mode == APP_MODE.CHAT:
+                """ 
+                NOTE NOTE NOTE
+                NOTE NOTE NOTE
+                PROBLEM WITH LONG QUERIES CAUSING ERRORS
+
+                MY QUESS IS TIME OUT OUR SOMETHING FUNKY GOING ON WITH ST.MARKDOWN TO WRITE USER MESSAGE
+                THEN CALL TO HANDLE_CHAT
+                NOTE NOTE NOTE
+                NOTE NOTE NOTE
+                """
+                query = add_references_to_query(query)
                 with st.chat_message('user'):
                     st.markdown(query)
-                handle_chat(selected_agent, query)
+                handle_chat(query)
             else:
                 st.session_state.menu_manager.handle_selection(query)
 
 #################################
 ##########   Chat  ##############
 #################################
-
-def handle_chat(selected_agent: str, query: str):
+def handle_chat(query: str):
     if query:
+        # Execute Query
         agent = st.session_state.agent_handler.active_agent
         response = asyncio.run(generate_and_display_response(agent, query))
-
+        # Post Query
         st.session_state.memory_cache.chat_memory.add_user_message(query)
         st.session_state.memory_cache.chat_memory.add_ai_message(response)
 
