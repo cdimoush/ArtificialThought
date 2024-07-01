@@ -34,7 +34,7 @@ def add_references_to_query(query: str):
         query = st.session_state.file_handler.write_file_content_to_query() + query
     return query
 
-async def handle_query(query: str):
+def handle_query(query: str):
     query = add_references_to_query(query)
     with st.chat_message('user'):
         st.markdown(query)
@@ -45,18 +45,10 @@ async def handle_query(query: str):
 #################################
 
 def handle_response(query: str):
-    if query:
-        agent = st.session_state.agent_handler.active_agent
-        response = asyncio.run(generate_and_display_response(agent, query))
-        typer.secho(f"Response: {response}", fg=typer.colors.GREEN)
-        st.session_state.memory_cache.chat_memory.add_ai_message(response)
-
-async def generate_and_display_response(agent, query: str):
-    response = await agent.generate_response(query)
     with st.chat_message('assistant'):
-        st.markdown(response)
-
-    return response
+        agent = st.session_state.agent_handler.active_agent
+        response = agent.generate_response(query, st.empty())
+        st.session_state.memory_cache.chat_memory.add_ai_message(response)
 
 #################################
 ##########   Main  ##############
@@ -76,7 +68,7 @@ def handle_chat():
             else: 
                 st.session_state.app_mode = APP_MODE.RESPONSE
                 st.session_state.memory_cache.chat_memory.add_user_message(query)
-                asyncio.run(handle_query(query))
+                handle_query(query)
 
             query = None
 

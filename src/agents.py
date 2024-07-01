@@ -9,10 +9,22 @@ from langchain.prompts import (
 )
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.callbacks.base import BaseCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
 import streamlit as st
 import typer
+
+class StreamHandler(BaseCallbackHandler):
+    def __init__(self, container):
+        self.container = container
+        self.text = ""
+
+    def on_llm_new_token(self, token: str, **kwargs):
+        # Debug
+        typer.secho(f"LLM TOKEN: {token}", fg=typer.colors.YELLOW)
+        self.text += token
+        self.container.markdown(self.text)
 
 class Agent:
     def __init__(self, title, **kwargs):
@@ -22,32 +34,24 @@ class Agent:
         self.model = kwargs.get('model', 'gpt-4-0125-preview')
 
         try:
-            self.build_llm()
+            self._build_llm()
         except Exception as e:
             st.error(f"Error building LLM: {e}")
 
-    def build_llm(self):
+    def _build_llm(self):
         if self.model_provider == 'openai':
-            self.llm = ChatOpenAI(model=self.model, streaming=True, callbacks=[StreamingStdOutCallbackHandler()], verbose=False)
+            self.llm = ChatOpenAI(model=self.model, streaming=True, verbose=False)
         else:
             raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
-        
-    async def _generate_and_display_response(self, query: str):
-        raise NotImplementedError
 
-    async def generate_response(self, query: str):
-        # Debug
-        typer.secho(f"Prompting agent:\n {query}", fg=typer.colors.GREEN)
+    def generate_response(self, query: str, container):
+        typer.secho(f"User QUERY:\n {query}", fg=typer.colors.GREEN)
         chain = self._build_chain()
-        assistant_response = ''
-        try:
-            async for chunk in chain.astream({'query': query}):
-                assistant_response += chunk
-                # Debug
-                typer.secho(f"Assistant response:\n {assistant_response}", fg=typer.colors.BLUE)
-        except Exception as e:
-            st.error(f"Error generating response: {e}")
-        
+        assistant_response = chain.invoke(
+            {'query': query},
+            {'callbacks': [StreamHandler(container)]},
+        )
+        typer.secho(f"Agent RESPONSE:\n {assistant_response}", fg=typer.colors.RED)
         return assistant_response
     
     def _build_chain(self):
