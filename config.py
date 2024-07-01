@@ -7,5 +7,6 @@ ROLE_MAP = {
 }
 
 class APP_MODE(Enum):
-    CHAT = auto()
     MENU = auto()
+    QUERY = auto()
+    RESPONSE = auto()

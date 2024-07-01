@@ -43,6 +43,5 @@ def display_system_messages():
     """
     Displays system messages, such as warnings or notifications, to the user.
     """
-    print(st.session_state)
     if not st.session_state['initial_state']:
         st.warning('You have reached the end of current development...')

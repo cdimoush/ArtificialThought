@@ -12,6 +12,7 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
 import streamlit as st
+import typer
 
 class Agent:
     def __init__(self, title, **kwargs):
@@ -27,7 +28,7 @@ class Agent:
 
     def build_llm(self):
         if self.model_provider == 'openai':
-            self.llm = ChatOpenAI(model=self.model, streaming=True, callbacks=[StreamingStdOutCallbackHandler()])
+            self.llm = ChatOpenAI(model=self.model, streaming=True, callbacks=[StreamingStdOutCallbackHandler()], verbose=False)
         else:
             raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
         
@@ -35,19 +36,21 @@ class Agent:
         raise NotImplementedError
 
     async def generate_response(self, query: str):
-        chain = self._build_chain(query)
+        # Debug
+        typer.secho(f"Prompting agent:\n {query}", fg=typer.colors.GREEN)
+        chain = self._build_chain()
         assistant_response = ''
         try:
             async for chunk in chain.astream({'query': query}):
                 assistant_response += chunk
-                # Print Chunk in Red
-                print(chunk, file=sys.stderr)
+                # Debug
+                typer.secho(f"Assistant response:\n {assistant_response}", fg=typer.colors.BLUE)
         except Exception as e:
             st.error(f"Error generating response: {e}")
         
         return assistant_response
     
-    def _build_chain(self, query: str):
+    def _build_chain(self):
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template(self.role),
             MessagesPlaceholder(variable_name='history'),

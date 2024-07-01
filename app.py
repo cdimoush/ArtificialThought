@@ -1,13 +1,15 @@
 # Third-party libraries
 import streamlit as st
+import typer
 
 # source imports
 from src.initialization import handle_session_initialization
 from src.ui_component import display_title, display_chat_history, display_system_messages
-from src.chat_interface import handle_user_input
+from src.chat_interface import handle_chat
 
 # Define main application function
 def main():
+    typer.secho("Running Loop", fg=typer.colors.RED)
     # Initialization
     handle_session_initialization()
     # Handle rerender requests
@@ -17,7 +19,7 @@ def main():
     display_system_messages()
     display_chat_history()
     # Handle chat
-    handle_user_input()
+    handle_chat()
 
 # Function to rerender the page if needed
 def rerender_page_if_needed():

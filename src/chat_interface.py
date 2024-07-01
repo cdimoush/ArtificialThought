@@ -3,6 +3,7 @@ import streamlit as st
 from streamlit_extras.bottom_container import bottom
 from config import APP_MODE
 from src.menu import initialize_menu_manager
+import typer
 
 #################################
 ##########   UI  ################
@@ -22,50 +23,32 @@ def handle_chat_options():
         with col2:
             st.write('[MICROPHONE PLACEHOLDER]')
 
+
+
+#################################
+##########   Query ##############
+#################################
+
 def add_references_to_query(query: str):
     if st.session_state.file_handler.has_file_content():
         query = st.session_state.file_handler.write_file_content_to_query() + query
     return query
 
-def handle_user_input():
-    handle_chat_options()
-    query = st.chat_input('Type a message')
-    if query:
-        if query.startswith('/'): # Toggle between chat and menu mode
-            if st.session_state.app_mode == APP_MODE.CHAT:
-                st.session_state.app_mode = APP_MODE.MENU
-                initialize_menu_manager()
-            else:
-                st.session_state.app_mode = APP_MODE.CHAT
-        else:
-            if st.session_state.app_mode == APP_MODE.CHAT:
-                """ 
-                NOTE NOTE NOTE
-                NOTE NOTE NOTE
-                PROBLEM WITH LONG QUERIES CAUSING ERRORS
+async def handle_query(query: str):
+    query = add_references_to_query(query)
+    with st.chat_message('user'):
+        st.markdown(query)
 
-                MY QUESS IS TIME OUT OUR SOMETHING FUNKY GOING ON WITH ST.MARKDOWN TO WRITE USER MESSAGE
-                THEN CALL TO HANDLE_CHAT
-                NOTE NOTE NOTE
-                NOTE NOTE NOTE
-                """
-                query = add_references_to_query(query)
-                with st.chat_message('user'):
-                    st.markdown(query)
-                handle_chat(query)
-            else:
-                st.session_state.menu_manager.handle_selection(query)
 
 #################################
-##########   Chat  ##############
+##########   Response  ##########
 #################################
-def handle_chat(query: str):
+
+def handle_response(query: str):
     if query:
-        # Execute Query
         agent = st.session_state.agent_handler.active_agent
         response = asyncio.run(generate_and_display_response(agent, query))
-        # Post Query
-        st.session_state.memory_cache.chat_memory.add_user_message(query)
+        typer.secho(f"Response: {response}", fg=typer.colors.GREEN)
         st.session_state.memory_cache.chat_memory.add_ai_message(response)
 
 async def generate_and_display_response(agent, query: str):
@@ -74,3 +57,38 @@ async def generate_and_display_response(agent, query: str):
         st.markdown(response)
 
     return response
+
+#################################
+##########   Main  ##############
+#################################
+
+def handle_chat():
+    # UI
+    handle_chat_options()
+    query = st.chat_input('Type a message')
+
+    # QUERY
+    if st.session_state.app_mode == APP_MODE.QUERY:
+        if query:
+            if query.startswith('/'): # Menu Toggle
+                st.session_state.app_mode = APP_MODE.MENU
+                initialize_menu_manager()
+            else: 
+                st.session_state.app_mode = APP_MODE.RESPONSE
+                st.session_state.memory_cache.chat_memory.add_user_message(query)
+                asyncio.run(handle_query(query))
+
+            query = None
+
+    # RESPONSE
+    if st.session_state.app_mode == APP_MODE.RESPONSE:
+        st.session_state.app_mode = APP_MODE.QUERY
+        handle_response(st.session_state.memory_cache.chat_memory.messages[-1])
+
+    # MENU
+    if st.session_state.app_mode == APP_MODE.MENU:
+        if query:
+            if query.startswith('/'): # Menu Toggle
+                st.session_state.app_mode = APP_MODE.QUERY
+            else:
+                st.session_state.menu_manager.handle_selection(query)
