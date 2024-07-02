@@ -15,17 +15,6 @@ from operator import itemgetter
 import streamlit as st
 import typer
 
-class StreamHandler(BaseCallbackHandler):
-    def __init__(self, container):
-        self.container = container
-        self.text = ""
-
-    def on_llm_new_token(self, token: str, **kwargs):
-        # Debug
-        typer.secho(f"LLM TOKEN: {token}", fg=typer.colors.YELLOW)
-        self.text += token
-        self.container.markdown(self.text)
-
 class Agent:
     def __init__(self, title, **kwargs):
         self.title = title
@@ -98,3 +87,12 @@ class AgentHandler:
             st.error(f"No agent configuration found for: {title}")
             return None
         return Agent(title, **self._agent_params[title])
+    
+class StreamHandler(BaseCallbackHandler):
+    def __init__(self, container):
+        self.container = container
+        self.text = ""
+
+    def on_llm_new_token(self, token: str, **kwargs):
+        self.text += token
+        self.container.markdown(self.text)

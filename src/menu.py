@@ -5,9 +5,6 @@ from langchain.memory import ConversationBufferMemory
 from src.file_handler import FolderNavigator, FileNavigator
 from src.agents import AgentHandler
 
-def clear_memory_cache():
-    st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
-    st.success("Memory cache cleared.")
 
 class MenuManager:
     def __init__(self, initial_menu):
@@ -36,11 +33,9 @@ class MenuManager:
                 selection = int(selection)
                 action = self.current_menu.get_action(selection)
                 if isinstance(action, Menu):
-                    # If the action is a Menu instance, navigate to that menu.
                     self.current_menu = action
                     self.menu_history.append(action)
                 elif callable(action):
-                    # If the action is a callable, execute it.
                     action()
                 else:
                     st.error("Invalid selection. Please try again.")
@@ -54,6 +49,10 @@ class MenuManager:
             self.current_menu = self.menu_history[-1]  # Set the current menu to the previous menu
         else:
             st.warning("You're at the top-level menu. There's no previous menu to go back to.")
+    
+    def reset(self):
+        self.current_menu = self.menu_history[0]
+        self.menu_history = [self.current_menu]
 
 class Menu:
     def __init__(self, title, options):
@@ -93,6 +92,7 @@ class AgentMenu(Menu):
         """Returns a function that sets the active agent based on the title."""
         def select_agent():
             handler.active_agent = title
+            st.session_state['menu_manager'].reset()
             st.success(f"Selected agent: {title}")
         return select_agent
     
@@ -115,8 +115,20 @@ class FileMenu(Menu):
         """ Load File...
         In the future add methods for extracting code from files. 
         """
-        options = {f"Load {nav.name}": nav.load_file}
+        options = {f"Load {nav.name}": self.make_load_file_function(nav)}
         super().__init__("File Menu", options)
+
+    def make_load_file_function(self, nav):
+        """Returns a function that loads the file based on the navigator."""
+        def load_file():
+            nav.load_file()
+            st.session_state['menu_manager'].reset()
+            st.success(f"Loaded file: {nav.name}")
+        return load_file
+    
+def clear_memory_cache():
+    st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
+    st.success("Memory cache cleared.")
 
 def initialize_menus():
     main_menu_options = {

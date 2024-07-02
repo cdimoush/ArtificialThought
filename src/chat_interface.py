@@ -1,4 +1,3 @@
-import asyncio
 import streamlit as st
 from streamlit_extras.bottom_container import bottom
 from config import APP_MODE
@@ -14,16 +13,12 @@ def handle_chat_options():
         (col1, col2) = st.columns(2)
         with col1:
             with st.popover('Options'):
-                # Fetch the current active agent title for display or selection
                 current_agent_title = st.session_state.agent_handler.active_agent.title if st.session_state.agent_handler.active_agent else None
                 selected_agent = st.selectbox('Agent Role', st.session_state.agent_handler.agent_titles, index=st.session_state.agent_handler.agent_titles.index(current_agent_title) if current_agent_title in st.session_state.agent_handler.agent_titles else 0)
-                # Update the active agent based on selection
                 if selected_agent != current_agent_title:
                     st.session_state.agent_handler.active_agent = selected_agent
         with col2:
             st.write('[MICROPHONE PLACEHOLDER]')
-
-
 
 #################################
 ##########   Query ##############
@@ -36,9 +31,9 @@ def add_references_to_query(query: str):
 
 def handle_query(query: str):
     query = add_references_to_query(query)
+    st.session_state.memory_cache.chat_memory.add_user_message(query)
     with st.chat_message('user'):
         st.markdown(query)
-
 
 #################################
 ##########   Response  ##########
@@ -67,7 +62,6 @@ def handle_chat():
                 initialize_menu_manager()
             else: 
                 st.session_state.app_mode = APP_MODE.RESPONSE
-                st.session_state.memory_cache.chat_memory.add_user_message(query)
                 handle_query(query)
 
             query = None
