@@ -8,17 +8,15 @@ import typer
 ##########   UI  ################
 #################################
 
-def handle_chat_options():
+def display_chat_options():
     with bottom():
         (col1, col2) = st.columns(2)
         with col1:
             with st.popover('Options'):
-                current_agent_title = st.session_state.agent_handler.active_agent.title if st.session_state.agent_handler.active_agent else None
-                selected_agent = st.selectbox('Agent Role', st.session_state.agent_handler.agent_titles, index=st.session_state.agent_handler.agent_titles.index(current_agent_title) if current_agent_title in st.session_state.agent_handler.agent_titles else 0)
-                if selected_agent != current_agent_title:
-                    st.session_state.agent_handler.active_agent = selected_agent
-        with col2:
-            st.write('[MICROPHONE PLACEHOLDER]')
+                st.write('You are in draft mode...')
+                st.write('Options:')
+                st.write('"/" --> Turn on menu mode')
+                st.write('"." --> Send message')
 
 #################################
 ##########   Query ##############
@@ -29,21 +27,31 @@ def add_references_to_query(query: str):
         query = st.session_state.file_handler.write_file_content_to_query() + query
     return query
 
-def handle_query(query: str):
-    query = add_references_to_query(query)
+def handle_query():
+    query = add_references_to_query(st.session_state.draft_cache)
     st.session_state.memory_cache.chat_memory.add_user_message(query)
-    with st.chat_message('user'):
-        st.markdown(query)
+    with st.session_state['col1']:
+        with st.chat_message('user'):
+            st.markdown(query)
+    st.session_state.draft_cache = ''
 
 #################################
 ##########   Response  ##########
 #################################
 
 def handle_response(query: str):
-    with st.chat_message('assistant'):
-        agent = st.session_state.agent_handler.active_agent
-        response = agent.generate_response(query, st.empty())
-        st.session_state.memory_cache.chat_memory.add_ai_message(response)
+    with st.session_state['col1']:
+        with st.chat_message('assistant'):
+            agent = st.session_state.agent_handler.active_agent
+            response = agent.generate_response(query, st.empty())
+            st.session_state.memory_cache.chat_memory.add_ai_message(response)
+
+#################################
+##########    Draft    ##########
+#################################
+
+def handle_draft_area():
+    st.session_state.draft_cache = st.session_state.draft_area
 
 #################################
 ##########   Main  ##############
@@ -51,14 +59,14 @@ def handle_response(query: str):
 
 def handle_chat():
     # UI
-    handle_chat_options()
+    display_chat_options()
     query = st.chat_input('Type a message')
 
     # QUERY
     if st.session_state.app_mode == APP_MODE.QUERY:
         if query:
             if query.startswith('/'): # Menu Toggle
-                st.session_state.app_mode = APP_MODE.MENU
+                st.session_state.app_mode = APP_MODE.DRAFT
                 initialize_menu_manager()
             else: 
                 st.session_state.app_mode = APP_MODE.RESPONSE
@@ -66,15 +74,22 @@ def handle_chat():
 
             query = None
 
+    # DRAFT
+    if st.session_state.app_mode == APP_MODE.DRAFT:
+        with st.session_state['col2']:
+            draft_container = st.empty()
+        if query:
+            if query == '/': # Menu Toggle
+                st.session_state.menu_manager.display_menu_as_dialog()
+            elif query == '.': # Response
+                st.session_state.app_mode = APP_MODE.RESPONSE
+                handle_query()
+            else:
+                st.session_state.draft_cache += '\n' + query
+        draft_container.text_area("Draft:", st.session_state.draft_cache, height=450, label_visibility='collapsed', on_change=handle_draft_area, key='draft_area')
+                    
     # RESPONSE
     if st.session_state.app_mode == APP_MODE.RESPONSE:
-        st.session_state.app_mode = APP_MODE.QUERY
+        st.session_state.app_mode = APP_MODE.DRAFT
+        typer.secho(f"Query: {st.session_state.memory_cache.chat_memory.messages[-1]}", fg=typer.colors.RED)
         handle_response(st.session_state.memory_cache.chat_memory.messages[-1])
-
-    # MENU
-    if st.session_state.app_mode == APP_MODE.MENU:
-        if query:
-            if query.startswith('/'): # Menu Toggle
-                st.session_state.app_mode = APP_MODE.QUERY
-            else:
-                st.session_state.menu_manager.handle_selection(query)

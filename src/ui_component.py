@@ -16,8 +16,9 @@ def display_chat_history():
     for message in st.session_state['memory_cache'].chat_memory.messages:
         # Using ROLE_MAP to get a user-friendly name for the message type
         message_role = ROLE_MAP.get(message.type, "Unknown")
-        with st.chat_message(message_role):
-            st.markdown(message.content)
+        with st.session_state['col1']:
+            with st.chat_message(message_role):
+                st.markdown(message.content)
         
 def display_chat_history_old():
     """

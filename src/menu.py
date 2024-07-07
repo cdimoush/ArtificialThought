@@ -5,7 +5,6 @@ from langchain.memory import ConversationBufferMemory
 from src.file_handler import FolderNavigator, FileNavigator
 from src.agents import AgentHandler
 
-
 class MenuManager:
     def __init__(self, initial_menu):
         """
@@ -21,7 +20,20 @@ class MenuManager:
         """
         self.current_menu.display()
 
-    def handle_selection(self, selection):
+    @st.experimental_dialog('Menu Selection')
+    def display_menu_as_dialog(self):
+        """
+        Display the current menu as a dialog.
+        """
+        menu_container = st.empty()
+        self.current_menu.display_dialog(menu_container)
+        menu_input = st.chat_input('Make a selection...')
+        if menu_input:
+            if self.handle_selection(menu_input):
+                self.current_menu.display_dialog(menu_container)
+                
+
+    def handle_selection(self, selection)->bool:
         """
         Handle the user's menu selection.
         :param selection: The user's selection.
@@ -38,10 +50,10 @@ class MenuManager:
                 elif callable(action):
                     action()
                 else:
-                    st.error("Invalid selection. Please try again.")
+                    return False
             except ValueError:
-                st.error("Invalid selection. Please try again.")
-        self.display_current_menu()
+                return False
+        return True
 
     def go_back(self):
         if len(self.menu_history) > 1:  # Ensure there's a previous menu to go back to
@@ -64,13 +76,25 @@ class Menu:
         self.title = title
         self.options = options
 
+    def display_dialog(self, container):
+        """
+        Display the menu as a dialog.
+        """
+        menu_str = f"**{self.title}**\n"
+        for idx, option in enumerate(self.options, start=1):
+            menu_str += f"{idx}. {option}\n"
+        with container:
+            st.markdown(menu_str)
+
     def display(self):
         """
         Display the menu options.
         """
-        st.markdown(f"**{self.title}**")
-        for idx, option in enumerate(self.options, start=1):
-            st.markdown(f"{idx}. {option}")
+        with st.session_state['col2']:
+            with st.chat_message('📝'):
+                st.markdown(f"**{self.title}**")
+                for idx, option in enumerate(self.options, start=1):
+                    st.markdown(f"{idx}. {option}")
 
     def get_action(self, choice):
         """
@@ -142,4 +166,3 @@ def initialize_menus():
 
 def initialize_menu_manager():
     st.session_state['menu_manager'] = initialize_menus()
-    st.session_state['menu_manager'].display_current_menu()

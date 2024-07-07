@@ -8,6 +8,21 @@ Convert audio to text to thought. Exploring utilization of LLM to utilize, conde
 
 ---
 # Log
+## 2024-07-07
+Good work this weekend, changed layout for drafting and dialogue menu. Going to push back to render after the following....
+
+1. Better file loading
+1.1. Add fences
+1.2. Add class or method loading options
+2. Standard Menu Status display
+3. Display selected agent
+4. Clean up
+
+Going forward it would nice to 
+1. Toggle in and out of draft mode
+2. Add a save button
+3. View agents and loaded files
+
 ## 2024-06-28
 Add some crazy recursive menu awhile back, starting to dig in again. Working on loading files.
 

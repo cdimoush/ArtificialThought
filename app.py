@@ -9,16 +9,34 @@ from src.chat_interface import handle_chat
 
 # Define main application function
 def main():
+    # Setup Layout
+    # ------------
     typer.secho("Running Loop", fg=typer.colors.RED)
+    st.set_page_config(layout="wide")
+    header = st.container()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.session_state['col1'] = st.container(height=500)
+    with col2:
+        st.session_state['col2'] = st.container(height=500)
+
     # Initialization
+    # ------------
     handle_session_initialization()
+
     # Handle rerender requests
+    # ------------
     rerender_page_if_needed()
+
     # Display UI
-    display_title()
-    display_system_messages()
+    # ------------
+    with header:
+        display_title()
+        display_system_messages()
     display_chat_history()
+
     # Handle chat
+    # ------------
     handle_chat()
 
 # Function to rerender the page if needed

@@ -10,3 +10,4 @@ class APP_MODE(Enum):
     MENU = auto()
     QUERY = auto()
     RESPONSE = auto()
+    DRAFT = auto()
