@@ -4,6 +4,8 @@ import sys
 from typing import Union
 import streamlit as st
 
+from src.file_operations import FileOperations
+
 class FolderNavigator:
     """ 
     Object for handling directory / file navagation and selection. 
@@ -44,18 +46,29 @@ class FolderNavigator:
             return f"{parts[-2]}/{parts[-1]}"
         else:
             return parts[-1]
-            
+
 class FileNavigator:
-    """ 
-    Object for opening and reading files.
-    """
     def __init__(self, file_path):
         self.file_path = file_path
         self.name = os.path.basename(file_path)
+        _, self.extension = os.path.splitext(self.file_path)
 
     def load_file(self):
-        with open(self.file_path, 'r') as file:
-            st.session_state.file_handler.add_file_content(self.name, file.read())
+        st.session_state.file_handler.add_file_content(self.name, FileOperations.load_reference_code(self.file_path))
+
+    def load_class(self):
+        # Placeholder for loading a specific class from the Python file
+        print("Placeholder for loading a class.")
+        # Pseudo code:
+        # Determine class to load based on user input or some criteria
+        # Extract class definition and related methods from the file
+
+    def load_method(self):
+        # Placeholder for loading a specific method from the Python file or class
+        print("Placeholder for loading a method.")
+        # Pseudo code:
+        # Determine method to load based on user input or some criteria
+        # Extract method definition from the class or file
 
 class FileHandler:
     """ 
@@ -85,9 +98,9 @@ class FileHandler:
     
     def write_file_content_to_query(self) -> str:
         """Format the file content into a single string to be added to the query."""
-        output = "(START FILE REFERENCE SECTION)\n NOTE: HUMAN HAS ATTACHED THE FOLLOWING REFERENCE FILES\n"
+        output = "(START FILE REFERENCE SECTION)\n NOTE: HUMAN HAS ATTACHED THE FOLLOWING REFERENCE FILES\n\n"
         for header, content in self.file_content.items():
-            output += f"\n--{header}--\n{content}\n\n"
+            output += f"{content}\n\n"
         output += "(END FILE REFERENCE SECTION)\n"
         self.clear_file_content()
         return output

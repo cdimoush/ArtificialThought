@@ -14,29 +14,30 @@ class MenuManager:
         self.current_menu = initial_menu
         self.menu_history = [initial_menu]  # Initialize the history with the initial menu
 
-    def display_current_menu(self):
-        """
-        Display the current menu.
-        """
-        self.current_menu.display()
-
     @st.experimental_dialog('Menu Selection')
     def display_menu_as_dialog(self):
         """
         Display the current menu as a dialog.
         """
+        menu_status = st.empty()
         menu_container = st.empty()
         self.current_menu.display_dialog(menu_container)
-        menu_input = st.chat_input('Make a selection...')
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            menu_input = st.chat_input('Make a selection...')
+        with col2:
+            menu_save = st.button('Save')
         if menu_input:
-            if self.handle_selection(menu_input):
+            if self.handle_selection(menu_input, menu_status):
                 self.current_menu.display_dialog(menu_container)
+        if menu_save:
+            st.rerun()
                 
-
-    def handle_selection(self, selection)->bool:
+    def handle_selection(self, selection, menu_status)->bool:
         """
         Handle the user's menu selection.
         :param selection: The user's selection.
+        :param menu_status: The status message container.
         """
         if selection == '..':
             self.go_back()
@@ -48,7 +49,7 @@ class MenuManager:
                     self.current_menu = action
                     self.menu_history.append(action)
                 elif callable(action):
-                    action()
+                    action(**{'menu_status': menu_status})
                 else:
                     return False
             except ValueError:
@@ -86,16 +87,6 @@ class Menu:
         with container:
             st.markdown(menu_str)
 
-    def display(self):
-        """
-        Display the menu options.
-        """
-        with st.session_state['col2']:
-            with st.chat_message('📝'):
-                st.markdown(f"**{self.title}**")
-                for idx, option in enumerate(self.options, start=1):
-                    st.markdown(f"{idx}. {option}")
-
     def get_action(self, choice):
         """
         Get the action associated with the user's choice.
@@ -114,10 +105,10 @@ class AgentMenu(Menu):
 
     def make_select_agent_function(self, handler, title):
         """Returns a function that sets the active agent based on the title."""
-        def select_agent():
+        def select_agent(menu_status, **kwargs):
             handler.active_agent = title
             st.session_state['menu_manager'].reset()
-            st.success(f"Selected agent: {title}")
+            menu_status.success(f"Selected agent: {title}")
         return select_agent
     
 class FolderMenu(Menu):
@@ -144,15 +135,23 @@ class FileMenu(Menu):
 
     def make_load_file_function(self, nav):
         """Returns a function that loads the file based on the navigator."""
-        def load_file():
+        def load_file(menu_status, **kwargs):
             nav.load_file()
             st.session_state['menu_manager'].reset()
-            st.success(f"Loaded file: {nav.name}")
+            menu_status.success(f"Loaded file: {nav.name}")
         return load_file
     
-def clear_memory_cache():
+    def make_load_class_function(self, nav):
+        """Returns a function that loads a specific class from the file."""
+        pass
+
+    def make_load_method_function(self, nav):
+        """Returns a function that loads a specific method from the file."""
+        pass
+    
+def clear_memory_cache(menu_status, **kwargs):
     st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
-    st.success("Memory cache cleared.")
+    menu_status.success("Memory cache cleared.")
 
 def initialize_menus():
     main_menu_options = {

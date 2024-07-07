@@ -11,7 +11,7 @@ from src.chat_interface import handle_chat
 def main():
     # Setup Layout
     # ------------
-    typer.secho("Running Loop", fg=typer.colors.RED)
+    typer.secho(f'Running Loop! Mode: {st.session_state.app_mode}', fg=typer.colors.RED)
     st.set_page_config(layout="wide")
     header = st.container()
     col1, col2 = st.columns(2)
@@ -19,10 +19,6 @@ def main():
         st.session_state['col1'] = st.container(height=500)
     with col2:
         st.session_state['col2'] = st.container(height=500)
-
-    # Initialization
-    # ------------
-    handle_session_initialization()
 
     # Handle rerender requests
     # ------------
@@ -48,4 +44,5 @@ def rerender_page_if_needed():
 
 # Main application entry point
 if __name__ == "__main__":
+    handle_session_initialization()
     main()

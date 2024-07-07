@@ -8,15 +8,15 @@ import typer
 ##########   UI  ################
 #################################
 
-def display_chat_options():
+def display_agent_popover():
     with bottom():
         (col1, col2) = st.columns(2)
         with col1:
-            with st.popover('Options'):
-                st.write('You are in draft mode...')
-                st.write('Options:')
-                st.write('"/" --> Turn on menu mode')
-                st.write('"." --> Send message')
+            with st.popover(f'Agent: {st.session_state.agent_handler.active_agent.title.upper()}'):
+                st.write(f'MODEL: ')
+                st.write(st.session_state.agent_handler.active_agent.model)
+                st.write(f'ROLE: ')
+                st.write(st.session_state.agent_handler.active_agent.role)
 
 #################################
 ##########   Query ##############
@@ -59,19 +59,14 @@ def handle_draft_area():
 
 def handle_chat():
     # UI
-    display_chat_options()
+    display_agent_popover()
     query = st.chat_input('Type a message')
 
-    # QUERY
+    # QUERY (REMINDER: Not currently using this mode.)
     if st.session_state.app_mode == APP_MODE.QUERY:
         if query:
-            if query.startswith('/'): # Menu Toggle
-                st.session_state.app_mode = APP_MODE.DRAFT
-                initialize_menu_manager()
-            else: 
-                st.session_state.app_mode = APP_MODE.RESPONSE
-                handle_query(query)
-
+            st.session_state.app_mode = APP_MODE.RESPONSE
+            handle_query(query)
             query = None
 
     # DRAFT
@@ -91,5 +86,4 @@ def handle_chat():
     # RESPONSE
     if st.session_state.app_mode == APP_MODE.RESPONSE:
         st.session_state.app_mode = APP_MODE.DRAFT
-        typer.secho(f"Query: {st.session_state.memory_cache.chat_memory.messages[-1]}", fg=typer.colors.RED)
         handle_response(st.session_state.memory_cache.chat_memory.messages[-1])

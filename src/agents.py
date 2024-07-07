@@ -61,6 +61,7 @@ class AgentHandler:
         self.config_path = config_path
         self._agent_params = self.load_agent_params()
         self._active_agent = None
+        self.active_agent = self.agent_titles[0]
 
     @property
     def agent_titles(self):

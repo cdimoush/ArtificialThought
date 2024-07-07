@@ -8,21 +8,7 @@ from typing import List, Tuple
 
 class FileOperations:
     @staticmethod
-    def load_reference_dir(dirpath):
-        """
-        Load reference code from all files in a directory.
-        """
-        reference_code = ''
-        for file_name in os.listdir(dirpath):
-            file_path = os.path.join(dirpath, file_name)
-            if os.path.isfile(file_path):
-                reference_code += f'*{file_name}*\n'
-                reference_code += FileOperations.load_reference_code(file_path)
-                reference_code += '\n'
-        return reference_code
-
-    @staticmethod
-    def load_reference_code(file_path, load_python_functions=False):
+    def load_reference_code(file_path):
         """
         Load reference code from a file.
         """
@@ -46,17 +32,13 @@ class FileOperations:
         try:
             ext = ext_map[file_extension[1:]]
             if ext == 'ipynb':
-                reference_code = FileOperations.load_notebook_code(file_content, load_python_functions)
-            elif ext == 'python' and load_python_functions:
-                reference_code = FileOperations.load_python_functions(file_content)
-            else:
-                reference_code = f'```{ext}\n{file_content}\n```'
+                ext = 'python'
+                file_content = FileOperations.load_notebook_code(file_content)
+            reference_code = f'```{ext}\n{file_content}\n```'
         except KeyError:
-            ext = 'unknown'
-
+            reference_code = file_content
         reference_code = f'*{file_name}*\n' + reference_code
         return reference_code
-
 
     @staticmethod
     def load_python_functions(file_content):
@@ -65,10 +47,8 @@ class FileOperations:
         """
         # Parse the file content into an Abstract Syntax Tree (AST)
         module = ast.parse(file_content)
-        # Extract all function definitions and class definitions from the AST
         functions = [node for node in module.body if isinstance(node, ast.FunctionDef)]
         classes = [node for node in module.body if isinstance(node, ast.ClassDef)]
-        # Initialize a dictionary to map function names to their respective class names
         func_class_dict = {}
         # Also, map the function names to the class name in func_class_dict
         for class_ in classes:
@@ -127,7 +107,7 @@ class FileOperations:
                 else:
                     # If the item is not a function or its class was not selected, add it to the reference code directly
                     code_block = ast.unparse(item)
-                    code_block = FileOperations.extract_comments(code_block, file_content)
+                    code_block = FileOperations._extract_comments(code_block, file_content)
                     reference_code += f'{code_block}\n'
             # For each class, add its definition and its functions to the reference code
             for class_name, items in selected_items_grouped.items():
@@ -135,14 +115,14 @@ class FileOperations:
                 reference_code += class_def
                 for item in items:
                     code_block = '\n'.join((f'\t{line}' for line in ast.unparse(item).split('\n')))
-                    code_block = FileOperations.extract_comments(code_block, file_content)
+                    code_block = FileOperations._extract_comments(code_block, file_content)
                     reference_code += f'{code_block}\n\n'
         # Wrap the reference code in a Python code block
         reference_code = f'```python\n{reference_code}\n```'
         return reference_code
    
     @staticmethod
-    def extract_comments(extracted_code, file_content):
+    def _extract_comments(extracted_code, file_content):
         """
         Take code extracted from unparsed AST and insert comments from the original file.
 
@@ -175,7 +155,7 @@ class FileOperations:
         return '\n'.join(modified_ast_lines)
 
     @staticmethod
-    def load_notebook_code(file_content, load_python_functions=False):
+    def load_notebook_code(file_content):
         """
         Load code blocks from a Jupyter Notebook.
         """
@@ -187,11 +167,5 @@ class FileOperations:
                 code = ''.join(cell['source'])
                 code = re.sub(r'^%.*$', '#\g<0>', code, flags=re.MULTILINE)
                 code_blocks.append(code)
-            # No markdown cells for now.
-            # elif cell['cell_type'] == 'markdown':
-                # Include the content of markdown cells.
-                # code_blocks.append(''.join(cell['source']))
         reference_code = '\n'.join(code_blocks)
-        if load_python_functions:
-            return FileOperations.load_python_functions(reference_code)
-        return f'```python\n{reference_code}\n```'
+        return reference_code

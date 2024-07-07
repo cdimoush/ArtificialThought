@@ -11,12 +11,15 @@ Convert audio to text to thought. Exploring utilization of LLM to utilize, conde
 ## 2024-07-07
 Good work this weekend, changed layout for drafting and dialogue menu. Going to push back to render after the following....
 
-1. Better file loading
-1.1. Add fences
+1. [DONE] Better file loading
+1.1. [DONE] Add fences
 1.2. Add class or method loading options
-2. Standard Menu Status display
-3. Display selected agent
-4. Clean up
+1.3. [DONE] Some files don't load bug!
+2. [DONE] Standard Menu Status display
+3. [Done] Display selected agent
+3.1 [DONE] Need auto reload after menu dialogue 
+4. [DONE] Handle response no query bug
+5. Clean up
 
 Going forward it would nice to 
 1. Toggle in and out of draft mode
