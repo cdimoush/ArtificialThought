@@ -6,6 +6,7 @@ import typer
 from src.initialization import handle_session_initialization
 from src.ui_component import display_title, display_chat_history, display_system_messages
 from src.chat_interface import handle_chat
+from config import APP_MODE
 
 # Define main application function
 def main():
@@ -14,11 +15,16 @@ def main():
     typer.secho(f'Running Loop! Mode: {st.session_state.app_mode}', fg=typer.colors.RED)
     st.set_page_config(layout="wide")
     header = st.container()
-    col1, col2 = st.columns(2)
-    with col1:
+
+    if st.session_state.app_mode == APP_MODE.DRAFT:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.session_state['col1'] = st.container(height=500)
+        with col2:
+            st.session_state['col2'] = st.container(height=500)
+    else:
         st.session_state['col1'] = st.container(height=500)
-    with col2:
-        st.session_state['col2'] = st.container(height=500)
+        st.session_state['col2'] = None
 
     # Handle rerender requests
     # ------------

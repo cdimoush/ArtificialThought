@@ -1,5 +1,6 @@
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import Pinecone
+import typer
 
 class PineconeUploadClient:
     def __init__(self, index_name: str):
@@ -9,7 +10,8 @@ class PineconeUploadClient:
     def upload(self, data):
         try:
             self.vectorstore.add_texts(data)
+            typer.secho(f'Uploaded chat history to Pinecone', fg=typer.colors.MAGENTA)
         except Exception as e:
-            print(f'Could not upload data to Pinecone: {e}')
+            typer.secho(f'Error uploading to Pinecone: {e}', fg=typer.colors.RED)
 
 

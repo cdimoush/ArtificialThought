@@ -3,6 +3,7 @@ import os
 import sys
 from typing import Union
 import streamlit as st
+import typer
 
 from src.file_operations import FileOperations
 
@@ -25,9 +26,11 @@ class FolderNavigator:
         contents = []
         for dir in self.dirs:
             dir = os.path.abspath(dir)
+            typer.secho(f"Listing contents of directory: {dir}", fg=typer.colors.GREEN)
             if not os.path.isdir(dir):
                 print(f"Directory '{dir}' does not exist.")
             else:
+                typer.secho(f"Contents: {os.listdir(dir)}", fg=typer.colors.GREEN)
                 for content in os.listdir(dir):
                     path = os.path.abspath(os.path.join(dir, content))
                     is_directory = os.path.isdir(path)
@@ -79,10 +82,11 @@ class FileHandler:
     """
     def __init__(self, config_path: str):
         self.config_path = config_path
+        self.dirs = [st.session_state['temp_dir']]
         self.file_content = {}
 
     def get_nav(self) -> FolderNavigator:
-        return FolderNavigator(self.load_dirs(self.config_path))
+        return FolderNavigator(self.dirs)
 
     def load_dirs(self, config_path):
         with open(config_path, 'r') as file:

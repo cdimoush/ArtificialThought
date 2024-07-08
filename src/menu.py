@@ -2,8 +2,9 @@ import streamlit as st
 from langchain.memory import ConversationBufferMemory
 
 # Local imports
-from src.file_handler import FolderNavigator, FileNavigator
+from src.file_handler import FileHandler, FolderNavigator, FileNavigator
 from src.agents import AgentHandler
+from config import APP_MODE
 
 class MenuManager:
     def __init__(self, initial_menu):
@@ -46,6 +47,9 @@ class MenuManager:
                 selection = int(selection)
                 action = self.current_menu.get_action(selection)
                 if isinstance(action, Menu):
+                    # Check if Menu has a reinstate method
+                    if hasattr(action, '__reinstate__'):
+                        action.__reinstate__()
                     self.current_menu = action
                     self.menu_history.append(action)
                 elif callable(action):
@@ -103,6 +107,13 @@ class AgentMenu(Menu):
         options = {f"{title}": self.make_select_agent_function(handler, title) for idx, title in enumerate(handler.agent_titles)}
         super().__init__("Select an Agent", options)
 
+    def __reinstate__(self):
+        """ Reinitialize the menu with the current agent handler. 
+        
+        TRASHY CODE REVIEW LATER
+        """
+        self.__init__(st.session_state.agent_handler)
+
     def make_select_agent_function(self, handler, title):
         """Returns a function that sets the active agent based on the title."""
         def select_agent(menu_status, **kwargs):
@@ -112,11 +123,19 @@ class AgentMenu(Menu):
         return select_agent
     
 class FolderMenu(Menu):
-    def __init__(self, nav: FolderNavigator):
+    def __init__(self, handler: FileHandler):
         """Dynamically generate options based on files in the directory. """
+        nav = handler.get_nav()
         file_names = nav.list_contents()
         options = {f"{name}": self.make_sub_menu(path, folder) for name, path, folder in file_names}
         super().__init__("Select Directory / File", options)
+
+    def __reinstate__(self):
+        """ Reinitialize the menu with the current file handler.
+
+        TRASHY CODE REVIEW LATER
+        """
+        self.__init__(st.session_state.file_handler)
 
     def make_sub_menu(self, path: str, folder: bool):
         """ Make sub menus for folder navigation. """
@@ -153,11 +172,20 @@ def clear_memory_cache(menu_status, **kwargs):
     st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
     menu_status.success("Memory cache cleared.")
 
+def toggle_draft_state(menu_status, **kwargs):
+    if st.session_state.app_mode == APP_MODE.DRAFT:
+        st.session_state.app_mode = APP_MODE.QUERY
+        menu_status.success("Query mode enabled.")
+    else:
+        st.session_state.app_mode = APP_MODE.DRAFT
+        menu_status.success("Draft mode enabled.")
+        
 def initialize_menus():
     main_menu_options = {
         "Select Agent": AgentMenu(st.session_state.agent_handler),
-        "Load File": FolderMenu(st.session_state.file_handler.get_nav()),
+        "Load File": FolderMenu(st.session_state.file_handler),
         "Clear Memory Cache": clear_memory_cache,
+        "Toggle Draft Mode": toggle_draft_state,
     }
     main_menu = Menu("Main Menu", main_menu_options)
     menu_manager = MenuManager(main_menu)

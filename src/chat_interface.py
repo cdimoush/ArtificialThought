@@ -1,22 +1,40 @@
 import streamlit as st
+import os
 from streamlit_extras.bottom_container import bottom
+from _pinecone_module.pinecone_upload_client import PineconeUploadClient
 from config import APP_MODE
-from src.menu import initialize_menu_manager
 import typer
 
 #################################
 ##########   UI  ################
 #################################
 
+def save_conversation():
+    """
+    Save the conversation to a file.
+    """
+    memory = st.session_state.memory_cache.buffer_as_str
+    puc = PineconeUploadClient('athought-trainer')
+    puc.upload([memory])
+
 def display_agent_popover():
     with bottom():
-        (col1, col2) = st.columns(2)
+        col1, col2, col3, _ = st.columns([1, 1, 1, 1], gap='small')
         with col1:
-            with st.popover(f'Agent: {st.session_state.agent_handler.active_agent.title.upper()}'):
+            with st.popover(f'Agent: {st.session_state.agent_handler.active_agent.title.upper()}', use_container_width=True):
                 st.write(f'MODEL: ')
                 st.write(st.session_state.agent_handler.active_agent.model)
                 st.write(f'ROLE: ')
                 st.write(st.session_state.agent_handler.active_agent.role)
+        with col2:
+            with st.popover('Load Files', use_container_width=True):
+                uploaded_file = st.file_uploader("File Uploader", type=['py', 'txt'])   
+                if uploaded_file is not None:
+                    write_path = os.path.join(st.session_state['temp_dir'], uploaded_file.name)
+                    with open(write_path, 'wb') as f:
+                        f.write(uploaded_file.read())
+        with col3:
+            st.button('Pinecone', on_click=save_conversation, use_container_width=True)
 
 #################################
 ##########   Query ##############
@@ -62,11 +80,16 @@ def handle_chat():
     display_agent_popover()
     query = st.chat_input('Type a message')
 
-    # QUERY (REMINDER: Not currently using this mode.)
+    # QUERY
     if st.session_state.app_mode == APP_MODE.QUERY:
         if query:
-            st.session_state.app_mode = APP_MODE.RESPONSE
-            handle_query(query)
+            if query == '/': # Menu Toggle
+                st.session_state.menu_manager.display_menu_as_dialog()
+            else:
+                # st.session_state.app_mode = APP_MODE.RESPONSE
+                st.session_state.draft_cache = query
+                handle_query()
+                handle_response(st.session_state.memory_cache.chat_memory.messages[-1])
             query = None
 
     # DRAFT
@@ -77,10 +100,12 @@ def handle_chat():
             if query == '/': # Menu Toggle
                 st.session_state.menu_manager.display_menu_as_dialog()
             elif query == '.': # Response
-                st.session_state.app_mode = APP_MODE.RESPONSE
+                # st.session_state.app_mode = APP_MODE.RESPONSE
                 handle_query()
+                handle_response(st.session_state.memory_cache.chat_memory.messages[-1])
             else:
-                st.session_state.draft_cache += '\n' + query
+                st.session_state.draft_cache += query + '\n'
+            query = None
         draft_container.text_area("Draft:", st.session_state.draft_cache, height=450, label_visibility='collapsed', on_change=handle_draft_area, key='draft_area')
                     
     # RESPONSE
