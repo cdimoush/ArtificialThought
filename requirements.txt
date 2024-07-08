@@ -1,5 +1,5 @@
 assemblyai==0.20.2
-langchain==0.1.14
+langchain==0.2.6
 langchain_core==0.2.11
 langchain-community==0.2.6
 langchain-openai==0.1.14
