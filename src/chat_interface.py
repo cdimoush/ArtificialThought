@@ -15,7 +15,7 @@ def save_conversation():
     """
     memory = st.session_state.memory_cache.buffer_as_str
     puc = PineconeUploadClient('athought-trainer')
-    puc.upload([memory])
+    puc.upload([memory], metadatas=[{'upload_method': 'button'}])
 
 def display_agent_popover():
     with bottom():

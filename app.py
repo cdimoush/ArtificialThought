@@ -19,11 +19,11 @@ def main():
     if st.session_state.app_mode == APP_MODE.DRAFT:
         col1, col2 = st.columns(2)
         with col1:
-            st.session_state['col1'] = st.container(height=500)
+            st.session_state['col1'] = st.container()
         with col2:
-            st.session_state['col2'] = st.container(height=500)
+            st.session_state['col2'] = st.container()
     else:
-        st.session_state['col1'] = st.container(height=500)
+        st.session_state['col1'] = st.container()
         st.session_state['col2'] = None
 
     # Handle rerender requests
