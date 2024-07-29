@@ -3,7 +3,6 @@ from langchain_pinecone import Pinecone
 import time
 import typer
 
-
 class PineconeUploadClient:
     def __init__(self, index_name: str):
         embeddings = OpenAIEmbeddings()
@@ -20,7 +19,6 @@ class PineconeUploadClient:
         else:
             for metadata in metadatas:
                 metadata['date'] = date_metadata
-
         try:
             # Include the metadatas parameter when adding texts
             self.vectorstore.add_texts(texts=data, metadatas=metadatas)
