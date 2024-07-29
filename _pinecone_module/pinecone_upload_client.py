@@ -27,3 +27,11 @@ class PineconeUploadClient:
             typer.secho('Uploaded chat history to Pinecone', fg=typer.colors.MAGENTA)
         except Exception as e:
             typer.secho(f'Error uploading to Pinecone: {e}', fg=typer.colors.RED)
+
+def save_conversation(memory_cache, upload_method=''):
+    """
+    Save the conversation to a file.
+    """
+    memory = memory_cache.buffer_as_str
+    puc = PineconeUploadClient('athought-trainer')
+    puc.upload([memory], metadatas=[{'upload_method': upload_method}])

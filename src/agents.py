@@ -1,5 +1,4 @@
 import yaml
-import sys
 from langchain_openai import ChatOpenAI
 from langchain.prompts import (
     ChatPromptTemplate,
@@ -8,7 +7,6 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
 )
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
@@ -83,11 +81,18 @@ class AgentHandler:
             config = yaml.safe_load(file)
         return config
 
-    def create_new_agent(self, title):
+    def create_new_agent(self, title, model=None):
         if title not in self._agent_params:
             st.error(f"No agent configuration found for: {title}")
             return None
-        return Agent(title, **self._agent_params[title])
+        
+        kwargs = self._agent_params[title]
+        if isinstance(model, str):
+            kwargs['model'] = model
+        return Agent(title, **kwargs)
+    
+    def change_model(self, model):
+        self._active_agent = self.create_new_agent(self.active_agent.title, model)
     
 class StreamHandler(BaseCallbackHandler):
     def __init__(self, container):

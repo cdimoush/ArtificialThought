@@ -1,22 +1,13 @@
 import streamlit as st
 import os
 from streamlit_extras.bottom_container import bottom
-from _pinecone_module.pinecone_upload_client import PineconeUploadClient
+from _pinecone_module.pinecone_upload_client import save_conversation
 from config import APP_MODE
 import typer
 
 #################################
 ##########   UI  ################
 #################################
-
-def save_conversation():
-    """
-    Save the conversation to a file.
-    """
-    memory = st.session_state.memory_cache.buffer_as_str
-    puc = PineconeUploadClient('athought-trainer')
-    puc.upload([memory], metadatas=[{'upload_method': 'button'}])
-
 def display_agent_popover():
     with bottom():
         col1, col2, col3, _ = st.columns([1, 1, 1, 1], gap='small')
@@ -28,13 +19,20 @@ def display_agent_popover():
                 st.write(st.session_state.agent_handler.active_agent.role)
         with col2:
             with st.popover('Load Files', use_container_width=True):
-                uploaded_file = st.file_uploader("File Uploader", type=['py', 'txt'])   
-                if uploaded_file is not None:
-                    write_path = os.path.join(st.session_state['temp_dir'], uploaded_file.name)
-                    with open(write_path, 'wb') as f:
-                        f.write(uploaded_file.read())
+                uploaded_files = st.file_uploader("File Uploader", type=['py', 'txt', 'yaml'], accept_multiple_files=True)
+
+                if uploaded_files is not None:
+                    for uploaded_file in uploaded_files:
+                        write_path = os.path.join(st.session_state['temp_dir'], uploaded_file.name)
+                        with open(write_path, 'wb') as f:
+                            f.write(uploaded_file.read())
+                            
         with col3:
-            st.button('Pinecone', on_click=save_conversation, use_container_width=True)
+            st.button('Pinecone', 
+                      on_click=save_conversation, 
+                      use_container_width=True,
+                      args=(st.session_state.memory_cache, 'button')
+            )
 
 #################################
 ##########   Query ##############
@@ -96,6 +94,7 @@ def handle_chat():
     if st.session_state.app_mode == APP_MODE.DRAFT:
         with st.session_state['col2']:
             draft_container = st.empty()
+            print(draft_container.height)
         if query:
             if query == '/': # Menu Toggle
                 st.session_state.menu_manager.display_menu_as_dialog()

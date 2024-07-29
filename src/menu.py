@@ -5,7 +5,37 @@ from langchain.memory import ConversationBufferMemory
 from src.file_handler import FileHandler, FolderNavigator, FileNavigator
 from src.agents import AgentHandler
 from config import APP_MODE
+from _pinecone_module.pinecone_upload_client import save_conversation
 
+def initialize_menus():
+    main_menu_options = {
+        "Select Agent": AgentMenu(st.session_state.agent_handler),
+        "Change Model": ModelMenu(st.session_state.agent_handler),
+        "Load File": FolderMenu(st.session_state.file_handler),
+        "Clear Memory Cache": clear_memory_cache,
+        "Toggle Draft Mode": toggle_draft_state,
+    }
+    main_menu = Menu("Main Menu", main_menu_options)
+    menu_manager = MenuManager(main_menu)
+    return menu_manager
+
+def initialize_menu_manager():
+    st.session_state['menu_manager'] = initialize_menus()
+
+def clear_memory_cache(menu_status, **kwargs):
+    """ Clear the memory cache. Include auto-save feature to backup to pinecone. """
+    save_conversation(st.session_state.memory_cache, 'auto-save')
+    st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
+    menu_status.success("Memory cache cleared.")
+
+def toggle_draft_state(menu_status, **kwargs):
+    if st.session_state.app_mode == APP_MODE.DRAFT:
+        st.session_state.app_mode = APP_MODE.QUERY
+        menu_status.success("Query mode enabled.")
+    else:
+        st.session_state.app_mode = APP_MODE.DRAFT
+        menu_status.success("Draft mode enabled.")
+        
 class MenuManager:
     def __init__(self, initial_menu):
         """
@@ -122,6 +152,31 @@ class AgentMenu(Menu):
             menu_status.success(f"Selected agent: {title}")
         return select_agent
     
+class ModelMenu(Menu):
+    def __init__(self, handler: AgentHandler):
+        models = [
+            'gpt-4o-2024-05-13',
+            'gpt-4o-mini-2024-07-18',
+            'gpt-4-0125-preview'
+        ]
+        options = {f"{model}": self.make_change_model_function(handler, model) for model in models}
+        super().__init__("Change Model", options)
+
+    def __reinstate__(self):
+        """ Reinitialize the menu with the current agent handler. 
+        
+        TRASHY CODE REVIEW LATER
+        """
+        self.__init__(st.session_state.agent_handler)
+
+    def make_change_model_function(self, handler, model):
+        """Returns a function that sets the active agent based on the title."""
+        def change_model(menu_status, **kwargs):
+            handler.change_model(model)
+            st.session_state['menu_manager'].reset()
+            menu_status.success(f"Agent model changed to: {model}")
+        return change_model
+    
 class FolderMenu(Menu):
     def __init__(self, handler: FileHandler):
         """Dynamically generate options based on files in the directory. """
@@ -168,28 +223,4 @@ class FileMenu(Menu):
         """Returns a function that loads a specific method from the file."""
         pass
     
-def clear_memory_cache(menu_status, **kwargs):
-    st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
-    menu_status.success("Memory cache cleared.")
 
-def toggle_draft_state(menu_status, **kwargs):
-    if st.session_state.app_mode == APP_MODE.DRAFT:
-        st.session_state.app_mode = APP_MODE.QUERY
-        menu_status.success("Query mode enabled.")
-    else:
-        st.session_state.app_mode = APP_MODE.DRAFT
-        menu_status.success("Draft mode enabled.")
-        
-def initialize_menus():
-    main_menu_options = {
-        "Select Agent": AgentMenu(st.session_state.agent_handler),
-        "Load File": FolderMenu(st.session_state.file_handler),
-        "Clear Memory Cache": clear_memory_cache,
-        "Toggle Draft Mode": toggle_draft_state,
-    }
-    main_menu = Menu("Main Menu", main_menu_options)
-    menu_manager = MenuManager(main_menu)
-    return menu_manager
-
-def initialize_menu_manager():
-    st.session_state['menu_manager'] = initialize_menus()
