@@ -6,7 +6,6 @@ import typer
 from config import APP_MODE
 from src.utils.file_handler import FileHandler
 from src.agents.agent_handler import AgentHandler
-from src.agents.agent_handler import AgentHandler
 from src.menus.agent_menu import AgentMenu, ModelMenu
 from src.menus.file_menu import FolderMenu 
 from src.menus.menu import MenuManager, Menu, SimpleMenuMethods
