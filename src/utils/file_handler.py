@@ -5,7 +5,7 @@ from typing import Union
 import streamlit as st
 import typer
 
-from src.file_operations import FileOperations
+from src.utils.file_operations import FileOperations
 
 class FolderNavigator:
     """ 

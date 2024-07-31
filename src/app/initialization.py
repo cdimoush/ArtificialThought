@@ -1,11 +1,15 @@
 import streamlit as st
 from langchain.memory import ConversationBufferMemory
-from src.agents import AgentHandler
-from src.file_handler import FileHandler
-from src.menu import initialize_menu_manager
-from config import APP_MODE
 import tempfile
 import typer
+
+from config import APP_MODE
+from src.utils.file_handler import FileHandler
+from src.agents.agent_handler import AgentHandler
+from src.agents.agent_handler import AgentHandler
+from src.menus.agent_menu import AgentMenu, ModelMenu
+from src.menus.file_menu import FolderMenu 
+from src.menus.menu import MenuManager, Menu, SimpleMenuMethods
 
 def handle_session_initialization():
     """
@@ -23,3 +27,19 @@ def handle_session_initialization():
         st.session_state['agent_handler'] = AgentHandler('config/agents.yaml')
         st.session_state['file_handler'] = FileHandler('config/dirs.yaml')
         initialize_menu_manager()
+
+
+def initialize_menus():
+    main_menu_options = {
+        "Select Agent": AgentMenu(st.session_state.agent_handler),
+        "Change Model": ModelMenu(st.session_state.agent_handler),
+        "Load File": FolderMenu(st.session_state.file_handler),
+        "Clear Memory Cache": SimpleMenuMethods.clear_memory_cache,
+        "Toggle Draft Mode": SimpleMenuMethods.toggle_draft_state,
+    }
+    main_menu = Menu("Main Menu", main_menu_options)
+    menu_manager = MenuManager(main_menu)
+    return menu_manager
+
+def initialize_menu_manager():
+    st.session_state['menu_manager'] = initialize_menus()
