@@ -1,5 +1,6 @@
 # base_agent.py
 from abc import ABC, abstractmethod
+import streamlit as st
 
 class BaseAgent(ABC):
     @abstractmethod
@@ -7,11 +8,11 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    def _build_llm(self):
+    def generate_response(self, query: str, container: st.container):
         pass
 
     @abstractmethod
-    def generate_response(self, query: str, container):
+    def _build_llm(self):
         pass
 
     @abstractmethod
