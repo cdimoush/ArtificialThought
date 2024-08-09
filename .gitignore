@@ -1,3 +1,20 @@
 _audio_module/frontend/node_modules
 _assemblyai_module/frontend/node_modules
 _assemblyai_module/frontend/.env
+
+
+
+# Folders
+__pycache__/
+
+# Large Files
+*.wav
+*.mp3
+*.mp4
+*.mov
+*.avi
+*.flv
+*.wmv
+
+# Compiled files
+*.pyc

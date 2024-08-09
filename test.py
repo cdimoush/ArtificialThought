@@ -1,5 +1,2 @@
-import streamlit as st
-
-print("RUNNING")
-st.title("Hello, Streamlit!")
-st.write("This is a simple test app.")
+import ssl
+print(ssl.get_default_verify_paths())
