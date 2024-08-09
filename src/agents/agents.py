@@ -1,7 +1,7 @@
 # agents.py
 import yaml
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, AIMessagePromptTemplate, PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
@@ -9,9 +9,11 @@ import streamlit as st
 import typer
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompt import INTROSPECTION_PROMPT
 from src.utils.stream_handler import StreamHandler
 
-class Agent(BaseAgent):
+    
+class SimpleAgent(BaseAgent):
     def __init__(self, title, **kwargs):
         self.title = title
         self.role = kwargs.get('role', 'you are a chat bot that chats.')
@@ -26,12 +28,12 @@ class Agent(BaseAgent):
     def generate_response(self, query: str, container):
         typer.secho(f"User QUERY:\n {query}", fg=typer.colors.GREEN)
         chain = self._build_chain()
-        assistant_response = chain.invoke(
+        agent_response = chain.invoke(
             {'query': query},
             {'callbacks': [StreamHandler(container)]},
         )
-        typer.secho(f"Agent RESPONSE:\n {assistant_response}", fg=typer.colors.RED)
-        return assistant_response
+        typer.secho(f"Agent RESPONSE:\n {agent_response}", fg=typer.colors.RED)
+        st.session_state.memory_cache.chat_memory.add_ai_message(agent_response)
     
     def _build_llm(self):
         if self.model_provider == 'openai':
@@ -51,3 +53,66 @@ class Agent(BaseAgent):
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
 
         return chain
+        
+class IntrospectiveAgent(BaseAgent):
+    def __init__(self, title, **kwargs):
+        self.title = title
+        self.role = kwargs.get('role', 'you are a chat bot that chats.')
+        self.model_provider = kwargs.get('model_provider', 'openai')
+        self.model = kwargs.get('model', 'gpt-4-0125-preview')
+
+        try:
+            self._build_llm()
+        except Exception as e:
+            st.error(f"Error building LLM: {e}")
+
+    def generate_response(self, query: str, container):
+        typer.secho(f"User QUERY:\n {query}", fg=typer.colors.GREEN)
+        # Introspection
+        introspection_chain = self._build_intro_chain()
+        introspection = introspection_chain.invoke(
+            {'query': query, 'role': self.role}
+        )
+        typer.secho(f"Introspection:\n {introspection}", fg=typer.colors.YELLOW)
+        st.session_state.memory_cache.chat_memory.add_ai_message(introspection)
+
+        # Response
+        chain = self._build_chain()
+        agent_response = chain.invoke(
+            {'query': query},
+            {'callbacks': [StreamHandler(container)]},
+        )
+        typer.secho(f"Agent RESPONSE:\n {agent_response}", fg=typer.colors.RED)
+        st.session_state.memory_cache.chat_memory.add_ai_message(agent_response)
+    
+    def _build_llm(self):
+        if self.model_provider == 'openai':
+            self.llm = ChatOpenAI(model=self.model, streaming=True, verbose=False)
+        else:
+            raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
+        
+    def _build_intro_chain(self):
+        prompt = INTROSPECTION_PROMPT
+
+        parser = StrOutputParser()
+
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+
+        return chain
+
+    def _build_chain(self):
+        prompt = ChatPromptTemplate(messages=[
+            SystemMessagePromptTemplate.from_template(self.role),
+            MessagesPlaceholder(variable_name='history'),
+            HumanMessagePromptTemplate.from_template('{query}'),
+        ])
+
+        parser = StrOutputParser()
+
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+
+        return chain
+
+class Agent(IntrospectiveAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)

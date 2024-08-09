@@ -59,8 +59,7 @@ def handle_response(query: str):
     with st.session_state['col1']:
         with st.chat_message('assistant'):
             agent = st.session_state.agent_handler.active_agent
-            response = agent.generate_response(query, st.empty())
-            st.session_state.memory_cache.chat_memory.add_ai_message(response)
+            agent.generate_response(query, st.empty())
 
 #################################
 ##########    Draft    ##########
