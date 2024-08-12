@@ -57,10 +57,25 @@ if __name__ == "__main__":
 
 
 # File: agents.py
-# agents.py
+# File: agents.py
+
+"""
+Agents Module
+
+This module contains classes and logic for creating and managing AI agents that interact with users. The agents are designed to handle various tasks based on their roles and configurations. Each agent can utilize different chains of logic and models to process user queries and generate appropriate responses.
+
+Classes:
+   - ChainableAgent: A base agent class that supports adding, removing, listing, and running chains of logic.
+   - SimpleAgent: A straightforward agent that utilizes a single chain to generate responses.
+   - IntrospectiveAgent: An advanced agent that performs introspection before generating a response.
+   - Agent: A specific implementation of IntrospectiveAgent with pre-configured behaviors and roles.
+
+The agents leverage the LangChain library for building prompt templates and processing chat interactions. They also support streaming responses for real-time interaction with users.
+"""
+
 import yaml
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate
+from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, AIMessagePromptTemplate, PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from operator import itemgetter
@@ -68,30 +83,44 @@ import streamlit as st
 import typer
 
 from src.agents.base_agent import BaseAgent
+from src.agents.prompt import INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
 from src.utils.stream_handler import StreamHandler
 
-class Agent(BaseAgent):
+class ChainableAgent(BaseAgent):
     def __init__(self, title, **kwargs):
         self.title = title
-        self.role = kwargs.get('role', 'you are a chat bot that chats.')
+        self.chains = []
+        self.role = kwargs.get('role', 'default role')
         self.model_provider = kwargs.get('model_provider', 'openai')
-        self.model = kwargs.get('model', 'gpt-4-0125-preview')
-
-        try:
-            self._build_llm()
-        except Exception as e:
-            st.error(f"Error building LLM: {e}")
+        self.model = kwargs.get('model', 'default-model')
+        self._build_llm()
 
     def generate_response(self, query: str, container):
-        typer.secho(f"User QUERY:\n {query}", fg=typer.colors.GREEN)
-        chain = self._build_chain()
-        assistant_response = chain.invoke(
-            {'query': query},
-            {'callbacks': [StreamHandler(container)]},
-        )
-        typer.secho(f"Agent RESPONSE:\n {assistant_response}", fg=typer.colors.RED)
-        return assistant_response
-    
+        response = self.run_chains(query, container)
+        print(f"Agent RESPONSE:\n {response}")
+
+        return response
+
+    def add_chain(self, chain):
+        self.chains.append(chain)
+
+    def remove_chain(self, chain):
+        if chain in self.chains:
+            self.chains.remove(chain)
+
+    def list_chains(self):
+        return self.chains
+
+    def run_chains(self, query, container):
+        output = [" " for _ in range(len(self.chains))]
+        for i, chain in enumerate(self.chains):
+            result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [StreamHandler(container)]})
+            st.session_state.memory_cache.chat_memory.add_ai_message(result)
+            output[i] = result
+            query += "\n" + result
+                    
+        return " \n ".join(output)   
+
     def _build_llm(self):
         if self.model_provider == 'openai':
             self.llm = ChatOpenAI(model=self.model, streaming=True, verbose=False)
@@ -99,66 +128,132 @@ class Agent(BaseAgent):
             raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
 
     def _build_chain(self):
+        pass
+
+class SimpleAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_chain()
+
+    def _build_chain(self):
         prompt = ChatPromptTemplate(messages=[
-            SystemMessagePromptTemplate.from_template(self.role),
+            SystemMessagePromptTemplate.from_template('{role}'),
             MessagesPlaceholder(variable_name='history'),
             HumanMessagePromptTemplate.from_template('{query}')
         ])
-
         parser = StrOutputParser()
-
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
 
-        return chain
+class IntrospectiveAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_intro_chain()
+        self._build_chain()
+
+    def _build_intro_chain(self):
+        prompt = INTROSPECTION_PROMPT
+        parser = StrOutputParser()
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
+
+    def _build_chain(self):
+        prompt = ChatPromptTemplate(messages=[
+            SystemMessagePromptTemplate.from_template('{role}'),
+            MessagesPlaceholder(variable_name='history'),
+            HumanMessagePromptTemplate.from_template('{query}')
+        ])
+        parser = StrOutputParser()
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
+
+class DevAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_chain()
+
+    def _build_chain(self):
+        prompts = [TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT, DEVELOPER_PROMPT]
+
+        for prompt in prompts:
+            if prompt == TASK_DEFINITION_PROMPT:
+                chain = RunnablePassthrough.assign(
+                    history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+                ) | prompt | self.llm | StrOutputParser()
+
+            else:
+                chain = prompt | self.llm | StrOutputParser()
+
+            self.add_chain(chain)
 
 
 
 # File: agent_handler.py
 import yaml
 import streamlit as st
-import typer
+from typing import Optional
+from src.agents.agents import ChainableAgent, SimpleAgent, IntrospectiveAgent, DevAgent
 
-from src.agents.agents import Agent
+AGENT_TYPE_MAP = {
+   'simple': SimpleAgent,
+   'introspective': IntrospectiveAgent,
+   'dev': DevAgent
+}
 
 class AgentHandler:
-    def __init__(self, config_path):
+    def __init__(self, config_path: str):
         self.config_path = config_path
-        self._agent_params = self.load_agent_params()
+        self._agent_params = self._load_agent_params()
         self._active_agent = None
         self.active_agent = self.agent_titles[0]
 
+    def change_model(self, model: str):
+        active_cls = self._active_agent.__class__
+        self._active_agent = self._create_new_agent_from_cls(active_cls, self.active_agent.title, model=model)
+
     @property
-    def agent_titles(self):
+    def agent_titles(self) -> list:
         return list(self._agent_params.keys())
 
     @property
-    def active_agent(self):
+    def active_agent(self) -> Optional[ChainableAgent]:
         return self._active_agent
 
     @active_agent.setter
-    def active_agent(self, title):
+    def active_agent(self, title: str):
         if title in self._agent_params:
-            self._active_agent = self.create_new_agent(title)
+            self._active_agent = self._create_new_agent(title)
         else:
             st.error(f"No agent configuration found for: {title}")
 
-    def load_agent_params(self):
+    def _load_agent_params(self) -> dict:
         with open(self.config_path, 'r') as file:
             config = yaml.safe_load(file)
         return config
 
-    def create_new_agent(self, title, model=None):
+    def _create_new_agent(self, title: str, model: str = None) -> Optional[ChainableAgent]:
         if title not in self._agent_params:
             st.error(f"No agent configuration found for: {title}")
             return None
-        
+
         kwargs = self._agent_params[title]
         if isinstance(model, str):
             kwargs['model'] = model
-        return Agent(title, **kwargs)
+
+        agent_type = kwargs.get('type', 'simple')
+        agent_class = AGENT_TYPE_MAP.get(agent_type)
+        if agent_class is None:
+            raise ValueError(f"Agent type {agent_type} is not supported.")
+
+        return self._create_new_agent_from_cls(agent_class, title, **kwargs)
     
-    def change_model(self, model):
-        self._active_agent = self.create_new_agent(self.active_agent.title, model)
+    def _create_new_agent_from_cls(self, cls: ChainableAgent, title: str, **kwargs) -> Optional[ChainableAgent]:
+        if title not in self._agent_params:
+            st.error(f"No agent configuration found for: {title}")
+            return None
+
+        return cls(title, **kwargs)
+
 
 
 # File: base_agent.py
@@ -182,6 +277,183 @@ class BaseAgent(ABC):
     @abstractmethod
     def _build_chain(self):
         pass
+
+
+# File: prompt.py
+from langchain_core.prompts.prompt import PromptTemplate
+
+_DEFAULT_INTROSPECTION_PROMPT_TEMPLATE = """You are a metacognition program That acts as a internal monolog for a artificial intelligent entity. This artificial intelligent entity is multifaceted and can play many different roles. You as a metacognition program understand the role that the artificial intelligence is set to and adjust your reflection accordingly.
+
+The artificial intellegence is chatting with a user and is attempting to best fulfill the use request by (1) understandings the user's request, (2) providing a response that alligns with their set role. 
+
+Before the artificial intelligence can response, the metacongition program must reflect on the chat history and the role that the artificial intelligence is set to. The metacogntion program prioritizes the most recent human message. The metacognition formats its output as an internal thought that the artificial intelligence is having. These thoughts can contain some or all of the following elements: (1) a reflection on the role that the artificial intelligence is set to, (2) a reflection on the chat history, (3) a reflection on the user's request, (4) a reflection on the artificial intelligence's response.
+
+If the conversation is simple the thought can be (internal thought: respond to the user's request). If the conversation is complex the thought can be like one of the following examples:
+
+Example 1:
+Role: You are an AI that only writes python code.
+Human Query: Hey, how do I write a program that counts to 10?
+Metacongition: (internal thought: I am a python AI, I should write a program that counts to 10. I should not address the user with a greeting, explanation, or any other language that is not python code. I should write a program that counts to 10.)
+
+Example 2:
+Role: You are an AI that plans software projects. You do not write code. You output concise plans in bullet points.
+Human Query: Hey, how do I write a program that solve forward kinematics for robot arms? Please reference details about my robot model.
+Metacongition: (internal thought: I am a project planning AI, I should output a concise plan in bullet points. These points should include how to write a program that solves forward kinematics for robot arms and reference details about the user's robot model. I should not output any code or long explanations.)
+
+End of Examples...
+
+YOU DO NOT NEED TO WRITE THE AI RESPONSE. ONLY WRITE THE INTERNAL THOUGHT THAT THE AI IS HAVING. YOU ONLY OUTPUT THE INTERNAL THOUGHT LABELED `internal thought:`. YOU PLACE THIS IN PERENTHESIS. THOUGHTS ARE NEVER MORE THAN 3 SENTENCES. YOU NEVER WRITE CODE. YOU NEVER ADDRESS THE USER.
+
+
+Role: {role}
+Chat History:
+{history}
+Human Query: 
+{query}
+
+
+"""
+
+INTROSPECTION_PROMPT = PromptTemplate(input_variables=["role", "history", "query"], template=_DEFAULT_INTROSPECTION_PROMPT_TEMPLATE)
+
+
+TASK_DEFINITION_PROMPT = PromptTemplate(
+    input_variables=["role", "history", "query"],
+    template="""
+    ## Role: 
+    {role}
+    
+    ## History: 
+    {history}
+    
+    ## Query: 
+    {query}
+
+    ## Task:
+    You're an superintelligent AI model developed to specialize in solving python programming problems from a high level. You are not a programmer. You provide instructions to programmers that work for you.
+
+    You do NOT write code. You do NOT output code. You only output instructions. You may be provided with instructions that you have been previously working on. If not explicitly asked to start over, continue from where you left off by listening for the user's request to revise, change, expand, or continue the instructions.
+
+    TEXT IN, INSTRUCTIONS OUT
+    
+    The text input that you receive could include the following:
+    - Dialogue
+    - Instructions
+    - Code (Reference, examples, previous solution attempts)
+    - Error messages
+
+    Interpret the text input and output instructions that would be understood by a junior software developer. These instructions should be specific enough to define the code needed to solve the problem. However, instructions should be between 50-100 words. Do not micromanage the programmer. Just get the most important information across. 
+
+    If the text input is not specific, make assumption of needs in instructions. If some needs cannot be determined, include a `open item` section in the instructions.
+
+    
+    INPUT EXAMPLE:
+    Human: I have a custom method that converts an integer into a solution. I have two variables that should be added toghether and then converted into a solution. I need a function that takes two arguments and returns a solution.
+
+    OUTPUT EXAMPLE:
+    Instructions:
+    - Write a function called solution_function that takes two arguments.
+    - Add the two arguments together.
+    - Use the custom method from the user's project to convert the sum into a solution.
+
+    Now respond to the query by completing the task.
+    """
+)
+
+DEVELOPER_PROMPT = PromptTemplate(
+    input_variables=["role", "query"],
+    template="""
+    ## Role: 
+    {role}
+        
+    ## Query: 
+    {query}
+
+    ## Task:
+    You are a program that outputs python code. TEXT IN, PYTHON CODE OUT. Only output python code. No additional text.
+
+    The text input that you receive could include the following:
+    The text input that you receive could include the following:
+    - Dialogue
+    - Instructions
+    - Code (Reference, examples, previous solution attempts)
+    - Error messages
+
+    Interpret the text input and output python code that solves the problem. If the text input is specific to the desired output code, then follow specification exactly. If the text input is not specific, make assumption of needs and include comments. If some needs cannot be determined, leave sections of the output code blank and include comments about the missing information. 
+
+    INPUT EXAMPLE:
+    Instructions:
+    - Write a function called solution_function that takes two arguments.
+    - Add the two arguments together.
+    - Use the custom method from the user's project to convert the sum into a solution.
+
+    OUTPUT EXAMPLE:
+    ''' python
+    def solution_function(arg1, arg2):
+      '''
+      Solution function calculated the solution by using (discussed method)
+      arg1: (type) description
+      arg2: (type) description
+      return: (type) description
+      '''
+
+      # Implementation of equation 1 
+      arg3 = arg1 + arg2
+
+      # [Insufficient information about equation 2 ...] 
+
+      return solution    
+
+    Now respond to the query by completing the task.
+    """
+)
+
+REVIEWER_PROMPT = PromptTemplate(
+   input_variables=["role", "query"],
+   template="""
+   ## Role: 
+   {role}
+
+   ## Query: 
+   {query}
+
+   ## Task:
+   You are a program that reviews python code. TEXT IN, REVIEW OUT. Only output review and critique. No additional text. 
+
+   The text input that you receive could include the following:
+   - Dialogue
+   - Instructions
+   - Code (Reference, examples, previous solution attempts)
+   - Error messages
+
+   Interpret the text input and provide constructive feedback on the code. Your review should focus on the following aspects:
+
+   1. **Correctness**: Identify any logical errors or issues in the code. Highlight where the code does not align with the original query or requirements.
+   2. **Efficiency**: Suggest improvements for optimizing the code in terms of performance and resource utilization.
+   3. **Readability**: Point out areas where the code can be made more readable and maintainable, including naming conventions, code structure, and comments.
+   4. **Best Practices**: Recommend changes that align with Python best practices and coding standards.
+   5. **Security**: Identify any potential security vulnerabilities or concerns in the code.
+
+   Format your output clearly with the following sections:
+
+   - **Feedback Summary**: A concise summary of the overall feedback.
+   - **Detailed Review**:
+     - **Correctness**:
+       - [Point out specific issues with line numbers if available]
+     - **Efficiency**:
+       - [Suggest optimizations]
+     - **Readability**:
+       - [Recommend improvements for readability]
+     - **Best Practices**:
+       - [Highlight deviations from best practices]
+     - **Security**:
+       - [Identify any security concerns]
+
+   Use bullet points for each section to organize your feedback. Do not include any code. Focus solely on providing actionable critique and guidance.
+
+   Now respond to the query by completing the task.
+   """
+)
 
 
 # File: chat_interface.py
@@ -246,8 +518,9 @@ def handle_response(query: str):
     with st.session_state['col1']:
         with st.chat_message('assistant'):
             agent = st.session_state.agent_handler.active_agent
-            response = agent.generate_response(query, st.empty())
-            st.session_state.memory_cache.chat_memory.add_ai_message(response)
+            chat_container = st.empty()
+            response = agent.generate_response(query, chat_container)
+            chat_container.markdown(response)
 
 #################################
 ##########    Draft    ##########
