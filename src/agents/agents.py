@@ -24,7 +24,12 @@ import streamlit as st
 import typer
 
 from src.agents.base_agent import BaseAgent
-from src.agents.prompt import INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
+from src.agents.prompt import (SIMPLE_INTROSPECTION_PROMPT,
+                               ROLE_INTROSPECTION_PROMPT,
+                               TASK_DEFINITION_PROMPT, 
+                               DEVELOPER_PROMPT, 
+                               REVIEWER_PROMPT
+                            )
 from src.utils.stream_handler import StreamHandler
 
 class ChainableAgent(BaseAgent):
@@ -93,7 +98,7 @@ class IntrospectiveAgent(ChainableAgent):
         self._build_chain()
 
     def _build_intro_chain(self):
-        prompt = INTROSPECTION_PROMPT
+        prompt = SIMPLE_INTROSPECTION_PROMPT
         parser = StrOutputParser()
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
         self.add_chain(chain)
@@ -106,6 +111,51 @@ class IntrospectiveAgent(ChainableAgent):
         ])
         parser = StrOutputParser()
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
+
+
+class RoleAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_role_chain()
+        self._build_chain()
+
+    def _build_role_chain(self):
+        prompt = ROLE_INTROSPECTION_PROMPT
+        parser = StrOutputParser()
+        
+        def update_role(result):
+            self.role = result
+            return result
+        
+        role_llm = ChatOpenAI(model='gpt-4o-mini-2024-07-18', streaming=True, verbose=False) 
+
+        chain = (
+            RunnablePassthrough.assign(
+                history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+            ) 
+            | prompt 
+            | role_llm
+            | parser 
+            | RunnableLambda(update_role)
+        )
+        self.add_chain(chain)
+
+    def _build_chain(self):
+        prompt = ChatPromptTemplate(messages=[
+            SystemMessagePromptTemplate.from_template('{role}'),
+            MessagesPlaceholder(variable_name='history'),
+            HumanMessagePromptTemplate.from_template('{query}')
+        ])
+        parser = StrOutputParser()
+        chain = (
+            RunnablePassthrough.assign(
+                history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+            ) 
+            | prompt 
+            | self.llm 
+            | parser
+        )
         self.add_chain(chain)
 
 class DevAgent(ChainableAgent):

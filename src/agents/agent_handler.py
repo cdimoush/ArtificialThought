@@ -1,12 +1,13 @@
 import yaml
 import streamlit as st
 from typing import Optional
-from src.agents.agents import ChainableAgent, SimpleAgent, IntrospectiveAgent, DevAgent
+from src.agents.agents import ChainableAgent, SimpleAgent, IntrospectiveAgent, DevAgent, RoleAgent
 
 AGENT_TYPE_MAP = {
    'simple': SimpleAgent,
    'introspective': IntrospectiveAgent,
-   'dev': DevAgent
+   'dev': DevAgent,
+   'role': RoleAgent
 }
 
 class AgentHandler:
