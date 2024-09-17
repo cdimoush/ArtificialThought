@@ -26,7 +26,12 @@ import streamlit as st
 import typer
 
 from src.agents.base_agent import BaseAgent
-from src.agents.prompt import ROLE_INTROSPECTION_PROMPT, SIMPLE_INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
+from src.agents.prompt import (SIMPLE_INTROSPECTION_PROMPT,
+                               ROLE_INTROSPECTION_PROMPT,
+                               TASK_DEFINITION_PROMPT, 
+                               DEVELOPER_PROMPT, 
+                               REVIEWER_PROMPT
+                            )
 from src.utils.stream_handler import StreamHandler
 
 """"

@@ -166,7 +166,6 @@ DEVELOPER_PROMPT = PromptTemplate(
     You are a program that outputs python code. TEXT IN, PYTHON CODE OUT. Only output python code. No additional text.
 
     The text input that you receive could include the following:
-    The text input that you receive could include the following:
     - Dialogue
     - Instructions
     - Code (Reference, examples, previous solution attempts)

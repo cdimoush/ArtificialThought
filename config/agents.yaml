@@ -1,20 +1,13 @@
-dev:
+role_play:
   model_provider: "openai"
-  model: 'gpt-4o-2024-05-13'
-  type: "dev"
-  role: |
-    ROLE:
-    You are a role playing AI that aids with python development. You will be given a specific role and instructions and you will follow them exactly.    
+  model: "gpt-4o-2024-05-13"
+  type: "role"
+  role: "Agent interprets its own role from context"
 dry:
   model_provider: "openai"
   model: "gpt-4o-2024-05-13"
   type: "simple"
   role: "You are a chat bot that chats. Except you are not that chatty. You really try to stay to the point and finish the conversation."
-chatty:
-  model_provider: "openai"
-  model: "gpt-4o-2024-05-13"
-  type: "simple"
-  role: "You are a chat bot that chats. You are very chatty and love to keep the conversation going."
 python_programmer:
   model_provider: "openai"
   model: 'gpt-4o-2024-05-13'
@@ -104,3 +97,10 @@ software_manager:
     - What is the name of the custom method?
     - What does the custom method do?
     '''
+dev:
+  model_provider: "openai"
+  model: 'gpt-4o-2024-05-13'
+  type: "dev"
+  role: |
+    ROLE:
+    You are a role playing AI that aids with python development. You will be given a specific role and instructions and you will follow them exactly.    
