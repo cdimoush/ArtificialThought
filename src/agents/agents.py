@@ -15,10 +15,12 @@ The agents leverage the LangChain library for building prompt templates and proc
 """
 
 import yaml
+from copy import deepcopy
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, AIMessagePromptTemplate, PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompt_values import StringPromptValue
 from operator import itemgetter
 import streamlit as st
 import typer
@@ -27,6 +29,25 @@ from src.agents.base_agent import BaseAgent
 from src.agents.prompt import INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
 from src.utils.stream_handler import StreamHandler
 
+""""
+YO MEMORY IDEAS FROM FROM THE COUCH!!!!!
+
+Create an internal memory as a deep copy of the main memory during `generate_response`. The chains should have a runnable lamda with a passthrough
+to add to this memory if you want to track intermediate steps.
+
+
+Main thought here is that chains should have there memory hidden from the main chat context
+
+
+# BUG!!!!
+Just realized that the Agents are recieving the query as both a query and in the history.
+
+# LEFT OFF
+just added fetch_memory start using this now!!! Goal here is to clean up the prompt that gets created for the RoleAgent.
+
+I want clean memory, query 
+"""
+
 class ChainableAgent(BaseAgent):
     def __init__(self, title, **kwargs):
         self.title = title
@@ -34,13 +55,22 @@ class ChainableAgent(BaseAgent):
         self.role = kwargs.get('role', 'default role')
         self.model_provider = kwargs.get('model_provider', 'openai')
         self.model = kwargs.get('model', 'default-model')
+        self.internal_memory = deepcopy(st.session_state.memory_cache)
         self._build_llm()
 
     def generate_response(self, query: str, container):
-        response = self.run_chains(query, container)
-        print(f"Agent RESPONSE:\n {response}")
+        return self.run_chains(query, container)
+    
+    def fetch_memory(self, *args, **kwargs):
+        return RunnablePassthrough.assign(history=RunnableLambda(self.internal_memory.load_memory_variables) | itemgetter('history'))
+    
+    def add_memory(self, message, *args, **kwargs):
+        self.internal_memory.add_ai_message(message)
 
-        return response
+    def debug_prompt(self, prompt):
+        for text in prompt.to_string().split("\n"):
+            typer.secho(f"\n{text}", fg=typer.colors.MAGENTA)
+        return prompt
 
     def add_chain(self, chain):
         self.chains.append(chain)
@@ -56,11 +86,7 @@ class ChainableAgent(BaseAgent):
         output = [" " for _ in range(len(self.chains))]
         for i, chain in enumerate(self.chains):
             result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [StreamHandler(container)]})
-            st.session_state.memory_cache.chat_memory.add_ai_message(result)
-            output[i] = result
-            query += "\n" + result
-                    
-        return " \n ".join(output)   
+        return result 
 
     def _build_llm(self):
         if self.model_provider == 'openai':
@@ -106,6 +132,51 @@ class IntrospectiveAgent(ChainableAgent):
         ])
         parser = StrOutputParser()
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
+
+
+class RoleAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_role_chain()
+        self._build_chain()
+
+    def _build_role_chain(self):
+        prompt = ROLE_INTROSPECTION_PROMPT
+        parser = StrOutputParser()
+        
+        def update_role(result):
+            self.role = result
+            return result
+        
+        role_llm = ChatOpenAI(model='gpt-4o-mini-2024-07-18', streaming=True, verbose=False) 
+
+        chain = (
+            RunnablePassthrough.assign(
+                history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+            ) 
+            | prompt 
+            | role_llm
+            | parser 
+            | RunnableLambda(update_role)
+        )
+        self.add_chain(chain)
+
+    def _build_chain(self):
+        prompt = ChatPromptTemplate(messages=[
+            SystemMessagePromptTemplate.from_template('{role}'),
+            MessagesPlaceholder(variable_name='history'),
+            HumanMessagePromptTemplate.from_template('{query}')
+        ])
+        parser = StrOutputParser()
+        chain = (
+            RunnablePassthrough.assign(
+                history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+            ) 
+            | prompt 
+            | self.llm 
+            | parser
+        )
         self.add_chain(chain)
 
 class DevAgent(ChainableAgent):

@@ -45,11 +45,11 @@ def add_references_to_query(query: str):
 
 def handle_query():
     query = add_references_to_query(st.session_state.draft_cache)
-    st.session_state.memory_cache.chat_memory.add_user_message(query)
     with st.session_state['col1']:
         with st.chat_message('user'):
             st.markdown(query)
     st.session_state.draft_cache = ''
+    return query
 
 #################################
 ##########   Response  ##########
@@ -62,6 +62,7 @@ def handle_response(query: str):
             chat_container = st.empty()
             response = agent.generate_response(query, chat_container)
             chat_container.markdown(response)
+    return response
 
 #################################
 ##########    Draft    ##########
@@ -73,6 +74,10 @@ def handle_draft_area():
 #################################
 ##########   Main  ##############
 #################################
+
+def handle_memory(query, response):
+    st.session_state.memory_cache.chat_memory.add_ai_message(query)
+    st.session_state.memory_cache.chat_memory.add_ai_message(response)
 
 def handle_chat():
     # UI
@@ -87,8 +92,9 @@ def handle_chat():
             else:
                 # st.session_state.app_mode = APP_MODE.RESPONSE
                 st.session_state.draft_cache = query
-                handle_query()
-                handle_response(st.session_state.memory_cache.chat_memory.messages[-1])
+                query = handle_query()
+                response = handle_response(query)
+                handle_memory(query, response)
             query = None
 
     # DRAFT
