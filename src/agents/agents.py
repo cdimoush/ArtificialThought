@@ -26,7 +26,7 @@ import streamlit as st
 import typer
 
 from src.agents.base_agent import BaseAgent
-from src.agents.prompt import INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
+from src.agents.prompt import ROLE_INTROSPECTION_PROMPT, SIMPLE_INTROSPECTION_PROMPT, TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT
 from src.utils.stream_handler import StreamHandler
 
 """"
@@ -119,7 +119,7 @@ class IntrospectiveAgent(ChainableAgent):
         self._build_chain()
 
     def _build_intro_chain(self):
-        prompt = INTROSPECTION_PROMPT
+        prompt = SIMPLE_INTROSPECTION_PROMPT
         parser = StrOutputParser()
         chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
         self.add_chain(chain)
