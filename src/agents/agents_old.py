@@ -28,75 +28,44 @@ import typer
 from src.agents.base_agent import BaseAgent
 from src.agents.prompt import (SIMPLE_INTROSPECTION_PROMPT,
                                ROLE_INTROSPECTION_PROMPT,
+                               TASK_DEFINITION_PROMPT, 
+                               DEVELOPER_PROMPT, 
+                               REVIEWER_PROMPT
                             )
-
 from src.utils.stream_handler import StreamHandler
-from functools import wraps
-from collections import OrderedDict
 
-""" 
-Chainable Agent:
-- This is a general base class for "agents" that use multiple llm inferences in a linear sequence. The external method
-is `generate_response` which calls the `_run_chains` method. To implement this class children must add chain instances to 
-the `chains` attribute. 
+""""
+YO MEMORY IDEAS FROM FROM THE COUCH!!!!!
+
+Create an internal memory as a deep copy of the main memory during `generate_response`. The chains should have a runnable lamda with a passthrough
+to add to this memory if you want to track intermediate steps.
+
+
+Main thought here is that chains should have there memory hidden from the main chat context
+
+
+# BUG!!!!
+Just realized that the Agents are recieving the query as both a query and in the history.
+
+# LEFT OFF
+just added fetch_memory start using this now!!! Goal here is to clean up the prompt that gets created for the RoleAgent.
+
+I want clean memory, query 
 """
-def register_chain(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        chain = func(self, *args, **kwargs)
-        self._add_chain(func.__name__, chain)
-        # DEBUG
-        print(f"Chain {func.__name__} added to {self.__class__.__name__}")
-        return chain
-    wrapper._is_chain = True
-    return wrapper
 
 class ChainableAgent(BaseAgent):
-    ###########################################################################################
-    #################              BASE AGENT METHODS        ##################################
-    ###########################################################################################
     def __init__(self, title, **kwargs):
         self.title = title
-        self.chains = OrderedDict()
+        self.chains = []
         self.role = kwargs.get('role', 'default role')
         self.model_provider = kwargs.get('model_provider', 'openai')
         self.model = kwargs.get('model', 'default-model')
         self.internal_memory = deepcopy(st.session_state.memory_cache)
         self._build_llm()
-        self._initialize_chains()
 
     def generate_response(self, query: str, container):
-        return self._run_chains(query, container)
-
-    def _build_llm(self):
-        if self.model_provider == 'openai':
-            self.llm = ChatOpenAI(model=self.model, streaming=True, verbose=False)
-        else:
-            raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
-        
-    ###########################################################################################
-    #################          CHAINABLE AGENT METHODS       ##################################
-    ###########################################################################################
-    def _initialize_chains(self):
-        cls = self.__class__
-        for method_name in cls.__dict__:
-            method = getattr(self, method_name)
-            if callable(method) and hasattr(method, '_is_chain'):
-                method()  # Call the chain-building method to build the chain and add it to `self.chains`
-        
-    def _run_chains(self, query, container):
-        result = None
-        for chain_name, chain in self.chains.items():
-            result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [StreamHandler(container)]})
-        return result 
+        return self.run_chains(query, container)
     
-    def _add_chain(self, name, chain):
-        self.chains[name] = chain
-
-    ###########################################################################################
-    #################              DEVELOPER METHODS          #################################
-    ###########################################################################################
-
     def fetch_memory(self, *args, **kwargs):
         return RunnablePassthrough.assign(history=RunnableLambda(self.internal_memory.load_memory_variables) | itemgetter('history'))
     
@@ -107,17 +76,37 @@ class ChainableAgent(BaseAgent):
         for text in prompt.to_string().split("\n"):
             typer.secho(f"\n{text}", fg=typer.colors.MAGENTA)
         return prompt
-    
 
-"""
-Chainable Agent Implementations
-"""
+    def add_chain(self, chain):
+        self.chains.append(chain)
+
+    def remove_chain(self, chain):
+        if chain in self.chains:
+            self.chains.remove(chain)
+
+    def list_chains(self):
+        return self.chains
+
+    def run_chains(self, query, container):
+        output = [" " for _ in range(len(self.chains))]
+        for i, chain in enumerate(self.chains):
+            result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [StreamHandler(container)]})
+        return result 
+
+    def _build_llm(self):
+        if self.model_provider == 'openai':
+            self.llm = ChatOpenAI(model=self.model, streaming=True, verbose=False)
+        else:
+            raise NotImplementedError(f"Model provider {self.model_provider} is not supported.")
+
+    def _build_chain(self):
+        pass
 
 class SimpleAgent(ChainableAgent):
     def __init__(self, title, **kwargs):
         super().__init__(title, **kwargs)
+        self._build_chain()
 
-    @register_chain
     def _build_chain(self):
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template('{role}'),
@@ -125,44 +114,49 @@ class SimpleAgent(ChainableAgent):
             HumanMessagePromptTemplate.from_template('{query}')
         ])
         parser = StrOutputParser()
-        return RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
 
 class IntrospectiveAgent(ChainableAgent):
     def __init__(self, title, **kwargs):
         super().__init__(title, **kwargs)
+        self._build_intro_chain()
+        self._build_chain()
 
-    @register_chain
     def _build_intro_chain(self):
         prompt = SIMPLE_INTROSPECTION_PROMPT
         parser = StrOutputParser()
-        return RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
 
-    @register_chain
-    def _build_main_chain(self):
+    def _build_chain(self):
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template('{role}'),
             MessagesPlaceholder(variable_name='history'),
             HumanMessagePromptTemplate.from_template('{query}')
         ])
         parser = StrOutputParser()
-        return RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        chain = RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')) | prompt | self.llm | parser
+        self.add_chain(chain)
+
 
 class RoleAgent(ChainableAgent):
     def __init__(self, title, **kwargs):
         super().__init__(title, **kwargs)
+        self._build_role_chain()
+        self._build_chain()
 
-    @register_chain
     def _build_role_chain(self):
         prompt = ROLE_INTROSPECTION_PROMPT
         parser = StrOutputParser()
-
+        
         def update_role(result):
             self.role = result
             return result
-
+        
         role_llm = ChatOpenAI(model='gpt-4o-mini-2024-07-18', streaming=True, verbose=False) 
 
-        return (
+        chain = (
             RunnablePassthrough.assign(
                 history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
             ) 
@@ -171,16 +165,16 @@ class RoleAgent(ChainableAgent):
             | parser 
             | RunnableLambda(update_role)
         )
+        self.add_chain(chain)
 
-    @register_chain
-    def _build_main_chain(self):
+    def _build_chain(self):
         prompt = ChatPromptTemplate(messages=[
             SystemMessagePromptTemplate.from_template('{role}'),
             MessagesPlaceholder(variable_name='history'),
             HumanMessagePromptTemplate.from_template('{query}')
         ])
         parser = StrOutputParser()
-        return (
+        chain = (
             RunnablePassthrough.assign(
                 history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
             ) 
@@ -188,3 +182,24 @@ class RoleAgent(ChainableAgent):
             | self.llm 
             | parser
         )
+        self.add_chain(chain)
+
+class DevAgent(ChainableAgent):
+    def __init__(self, title, **kwargs):
+        super().__init__(title, **kwargs)
+        self._build_chain()
+
+    def _build_chain(self):
+        prompts = [TASK_DEFINITION_PROMPT, DEVELOPER_PROMPT, REVIEWER_PROMPT, DEVELOPER_PROMPT]
+
+        for prompt in prompts:
+            if prompt == TASK_DEFINITION_PROMPT:
+                llm = ChatOpenAI(model='gpt-4o-mini-2024-07-18', streaming=True, verbose=False)
+                chain = RunnablePassthrough.assign(
+                    history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history')
+                ) | prompt | llm | StrOutputParser()
+
+            else:
+                chain = prompt | self.llm | StrOutputParser()
+
+            self.add_chain(chain)

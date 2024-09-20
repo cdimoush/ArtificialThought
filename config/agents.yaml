@@ -97,10 +97,3 @@ software_manager:
     - What is the name of the custom method?
     - What does the custom method do?
     '''
-dev:
-  model_provider: "openai"
-  model: 'gpt-4o-2024-05-13'
-  type: "dev"
-  role: |
-    ROLE:
-    You are a role playing AI that aids with python development. You will be given a specific role and instructions and you will follow them exactly.    

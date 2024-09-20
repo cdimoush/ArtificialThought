@@ -14,7 +14,3 @@ class BaseAgent(ABC):
     @abstractmethod
     def _build_llm(self):
         pass
-
-    @abstractmethod
-    def _build_chain(self):
-        pass
