@@ -26,11 +26,9 @@ class FolderNavigator:
         contents = []
         for dir in self.dirs:
             dir = os.path.abspath(dir)
-            typer.secho(f"Listing contents of directory: {dir}", fg=typer.colors.GREEN)
             if not os.path.isdir(dir):
                 print(f"Directory '{dir}' does not exist.")
             else:
-                typer.secho(f"Contents: {os.listdir(dir)}", fg=typer.colors.GREEN)
                 for content in os.listdir(dir):
                     path = os.path.abspath(os.path.join(dir, content))
                     is_directory = os.path.isdir(path)

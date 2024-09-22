@@ -19,14 +19,11 @@ def handle_session_initialization():
         typer.secho('Initializing Session State...', fg=typer.colors.GREEN)
         st.session_state['initial_state'] = True
         st.session_state['app_mode'] = APP_MODE.QUERY
-        st.session_state['rerender'] = False
         st.session_state['temp_dir'] = tempfile.mkdtemp()
         st.session_state['memory_cache'] = ConversationBufferMemory(return_messages=True)
-        st.session_state['draft_cache'] = ''
         st.session_state['agent_handler'] = AgentHandler('config/agents.yaml')
         st.session_state['file_handler'] = FileHandler('config/dirs.yaml')
         initialize_menu_manager()
-
 
 def initialize_menus():
     main_menu_options = {
@@ -34,7 +31,6 @@ def initialize_menus():
         "Change Model": ModelMenu(st.session_state.agent_handler),
         "Load File": FolderMenu(st.session_state.file_handler),
         "Clear Memory Cache": SimpleMenuMethods.clear_memory_cache,
-        "Toggle Draft Mode": SimpleMenuMethods.toggle_draft_state,
     }
     main_menu = Menu("Main Menu", main_menu_options)
     menu_manager = MenuManager(main_menu)
