@@ -1,7 +1,6 @@
 import os
 import streamlit as st
 from config import ROLE_MAP
-from _pinecone_module.pinecone_upload_client import save_conversation
 from streamlit_extras.bottom_container import bottom
 
 def display_title():
@@ -47,13 +46,6 @@ def display_popover_menu():
                     with open(write_path, 'wb') as f:
                         f.write(uploaded_file.read())
                         
-    with col3:
-        st.button('Pinecone', 
-                    on_click=save_conversation, 
-                    use_container_width=True,
-                    args=(st.session_state.memory_cache, 'button')
-        )
-
 
 def display_chat_interface():
     return st.chat_input('Type a message')

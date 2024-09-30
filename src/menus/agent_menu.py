@@ -1,6 +1,5 @@
 import streamlit as st
 from langchain.memory import ConversationBufferMemory
-from _pinecone_module.pinecone_upload_client import save_conversation
 
 # Local imports
 from src.agents.agent_handler import AgentHandler

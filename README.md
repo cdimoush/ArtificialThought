@@ -8,6 +8,9 @@ Convert audio to text to thought. Exploring utilization of LLM to utilize, conde
 
 ---
 # Log
+
+## 2024-09-27
+Breaking apart agent files!!!
 ## 2024-07-28
 Been using the app! This is good, merging in a nightly I've been working on to add metadata to pinecone upload. What I want now is a simple chain that does REACT for every query.
 

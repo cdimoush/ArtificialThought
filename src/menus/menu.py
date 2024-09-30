@@ -1,6 +1,5 @@
 import streamlit as st
 from langchain.memory import ConversationBufferMemory
-from _pinecone_module.pinecone_upload_client import save_conversation
 
 # Local imports
 from config import APP_MODE
@@ -105,7 +104,6 @@ class SimpleMenuMethods:
     @staticmethod
     def clear_memory_cache(menu_status, **kwargs):
         """ Clear the memory cache. Include auto-save feature to backup to pinecone. """
-        save_conversation(st.session_state.memory_cache, 'auto-save')
         st.session_state.memory_cache = ConversationBufferMemory(return_messages=True)
         menu_status.success("Memory cache cleared.")
 
