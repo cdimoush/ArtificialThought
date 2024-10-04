@@ -1,7 +1,9 @@
 import streamlit as st
+from src.app.ui_component import display_last_message
 import os
 from config import APP_MODE
 import typer
+import time
 
 def add_references_to_query(query: str):
     """
@@ -16,29 +18,23 @@ def handle_query(query, body):
     Add references then display the query.
     """
     query = add_references_to_query(query)    
+    st.session_state.memory_handler.add_user_message(query, {})
     with body:
-        with st.chat_message('user'):
-            st.markdown(query)
+        display_last_message()
+
     return query
 
 def handle_response(query, body):
     """
     Generate a response using the active agent and display it.
     """
+    agent = st.session_state.agent_handler.active_agent
+    st.session_state.memory_handler.add_ai_message('', {})
     with body:
         with st.chat_message('assistant'):
-            agent = st.session_state.agent_handler.active_agent
-            chat_container = st.empty()
-            response = agent.generate_response(query, chat_container)
-            chat_container.markdown(response)
-    return response
+            response = agent.generate_response(query)
 
-def handle_memory(query, response):
-    """
-    Add the query and response to the chat memory.
-    """
-    st.session_state.memory_cache.chat_memory.add_user_message(query)
-    st.session_state.memory_cache.chat_memory.add_ai_message(response)
+    return response
 
 def handle_chat(query, body):
     """
@@ -51,5 +47,5 @@ def handle_chat(query, body):
         else:
             query = handle_query(query, body)
             response = handle_response(query, body)
-            handle_memory(query, response)
+            # handle_memory(query, response)
         query = None

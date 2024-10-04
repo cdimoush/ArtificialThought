@@ -9,6 +9,7 @@ from src.agents.agent_handler import AgentHandler
 from src.menus.agent_menu import AgentMenu, ModelMenu
 from src.menus.file_menu import FolderMenu 
 from src.menus.menu import MenuManager, Menu, SimpleMenuMethods
+from src.utils.memory_handler import MemoryHandler
 
 def handle_session_initialization():
     """
@@ -21,6 +22,7 @@ def handle_session_initialization():
         st.session_state['app_mode'] = APP_MODE.QUERY
         st.session_state['temp_dir'] = tempfile.mkdtemp()
         st.session_state['memory_cache'] = ConversationBufferMemory(return_messages=True)
+        st.session_state['memory_handler'] = MemoryHandler(st.session_state.memory_cache)
         st.session_state['agent_handler'] = AgentHandler('config/agents.yaml')
         st.session_state['file_handler'] = FileHandler('config/dirs.yaml')
         initialize_menu_manager()

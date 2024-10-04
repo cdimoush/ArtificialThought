@@ -21,12 +21,51 @@ def display_chat_history():
     Displays the chat history in the Streamlit application.
     Uses the global ROLE_MAP to assign user-friendly names to message types.
     """
-    # There's new message(s), update the display
-    for message in st.session_state['memory_cache'].chat_memory.messages:
-        # Using ROLE_MAP to get a user-friendly name for the message type
-        message_role = ROLE_MAP.get(message.type, "Unknown")
-        with st.chat_message(message_role):
-            st.markdown(message.content)
+    for message, info in st.session_state.memory_handler:
+        role = ROLE_MAP.get(message.type, "Unknown")
+        with st.chat_message(role):
+            display_info(info)
+            display_message(message)
+
+def display_last_message(container = None):
+    """
+    Display the last message in the chat history.
+    """
+    if len(st.session_state.memory_handler) > 0:
+        message, info = st.session_state.memory_handler[-1]
+        role = ROLE_MAP.get(message.type, "Unknown")
+        with container if container else st.chat_message(role):
+            display_info(info, expanded=True)
+            display_message(message)
+
+def display_message(message, container=None):
+    """
+    Display the main body of the message.
+    """
+    container = container or st.container()
+    with container:
+        st.markdown(message.content)
+
+def display_info(info, container=None, expanded=False):
+    """
+    Display additional information in expanders.
+    """
+    container = container or st.container()
+    with container:
+        if info:
+            for key, value in info.items():
+                with st.expander(key, expanded=expanded):
+                    st.markdown(f"**{key}:**")
+                    st.markdown(value)
+
+def display_message_content(message, info, container=None, expanded=False):
+    """
+    Display the message content with optional expander for additional information.
+    """
+    container = container or st.container()
+    with container:
+        display_info(info, container, expanded)
+        display_message(message, container)
 
 def display_popover_menu():
     col1, col2, col3, _ = st.columns([1, 1, 1, 1], gap='small')

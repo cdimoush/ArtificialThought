@@ -1,6 +1,11 @@
+dry:
+  model_provider: "openai"
+  model: "gpt-4o-mini"
+  type: "simple"
+  role: "You are a chat bot that chats. Except you are not that chatty. You really try to stay to the point and finish the conversation."
 rag:
   model_provider: "openai"
-  model: "gpt-4o-2024-05-13"
+  model: "gpt-4o-mini"
   type: "pinecone"
   role: "Agent interprets is hooked up to pinecone vector db and uses RAG to answer user queries"
 role_play:
@@ -8,11 +13,6 @@ role_play:
   model: "gpt-4o-2024-05-13"
   type: "role"
   role: "Agent interprets its own role from context"
-dry:
-  model_provider: "openai"
-  model: "gpt-4o-2024-05-13"
-  type: "simple"
-  role: "You are a chat bot that chats. Except you are not that chatty. You really try to stay to the point and finish the conversation."
 python_programmer:
   model_provider: "openai"
   model: 'gpt-4o-2024-05-13'

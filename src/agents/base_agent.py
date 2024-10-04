@@ -7,10 +7,13 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import streamlit as st
+from streamlit.elements.layouts import LayoutsMixin as st_container
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
-from src.utils.stream_handler import StreamHandler
+from src.utils.stream_handler import StreamHandler, get_streamhandler_cb
+from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
+
 
 import typer
 
@@ -22,7 +25,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    def generate_response(self, query: str, container: st.container):
+    def generate_response(self, query: str):
         pass
 
     @abstractmethod
@@ -41,7 +44,7 @@ class ChainableAgent(BaseAgent):
     ###########################################################################################
     #################              BASE AGENT METHODS        ##################################
     ###########################################################################################
-    def __init__(self, title, **kwargs):
+    def __init__(self, title: str, **kwargs):
         self.title = title
         self.chains = OrderedDict()
         self.role = kwargs.get('role', 'default role')
@@ -51,8 +54,8 @@ class ChainableAgent(BaseAgent):
         self._build_llm()
         self._initialize_chains()
 
-    def generate_response(self, query: str, container):
-        return self._run_chains(query, container)
+    def generate_response(self, query: str):
+        return self._run_chains(query)
 
     def _build_llm(self):
         if self.model_provider == 'openai':
@@ -70,10 +73,11 @@ class ChainableAgent(BaseAgent):
             if callable(method) and hasattr(method, '_is_chain'):
                 method()  # Call the chain-building method to build the chain and add it to `self.chains`
         
-    def _run_chains(self, query, container):
+    def _run_chains(self, query: str):
         result = None
+        cb = get_streamhandler_cb()
         for chain_name, chain in self.chains.items():
-            result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [StreamHandler(container)]})
+            result = chain.invoke({'role': self.role, 'query': query}, {'callbacks': [cb]})
         return result 
     
     def _add_chain(self, name, chain):
