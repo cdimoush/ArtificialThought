@@ -67,6 +67,10 @@ def display_message_content(message, info, container=None, expanded=False):
         display_info(info, container, expanded)
         display_message(message, container)
 
+def display_menu_button():
+    if st.button('Menu', use_container_width=True):
+        st.session_state.menu_manager.display_menu_as_dialog()
+
 def display_popover_menu():
     col1, col2, col3, _ = st.columns([1, 1, 1, 1], gap='small')
     with col1:

@@ -13,7 +13,7 @@ class MenuManager:
         self.current_menu = initial_menu
         self.menu_history = [initial_menu]  # Initialize the history with the initial menu
 
-    @st.experimental_dialog('Menu Selection')
+    @st.dialog('Menu Selection')
     def display_menu_as_dialog(self):
         """
         Display the current menu as a dialog.
