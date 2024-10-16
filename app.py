@@ -51,6 +51,21 @@ def main():
         # ------------
         handle_chat(query, body)
 
+    # Dashboard Tab
+    # ------------
+    with tab_dashboard:
+        # Display current agent name and role
+        st.markdown('## Dashboard')
+        # Start of Selection
+        st.markdown(f"**Current Agent:** {st.session_state.agent_handler.active_agent.title.upper()}")
+        st.markdown(f"**Role:** {st.session_state.agent_handler.active_agent.role}")
+
+    # About Tab
+    # ------------
+    with tab_about:
+        st.markdown('## About')
+        st.markdown('This is a chat application built with Streamlit, Langchain, and Pinecone.')
+
 # Main application entry point
 if __name__ == "__main__":
     main()
