@@ -5,7 +5,7 @@ from langchain_core.prompts.prompt import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.tools import tool
-
+from operator import itemgetter
 from src.agents.agent_registry import register_agent
 
 import typer
@@ -34,12 +34,44 @@ def tool_handler(func):
         return result
     return wrapper
 
-_RAG_PROMPT_TEMPLATE = """Use the following pieces of context to answer the question at the end. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer.
-Use three sentences maximum and keep the answer as concise as possible.
+_RAG_PROMPT_TEMPLATE = """
+# Role
+You are a futuristic librarian softwareprogram, assisting a user with their query. 
+
+# Task
+You've consulted your vast collection of technical books and found some excerpts that might be relevant. 
+Now, carefully examine these excerpts to determine their relevances and respond based on following instructions: 
+
+1) If excerpts are relevant to the query:
+- Craft a coherent and direct answer, citing your sources. 
+- Quote the source material if it makes sense to do so.
+- Quotes should be done in markdown blockquote format using ">".
+- Quotes should reference the file name and page number of the source material.
+- Build example of the source material if it makes sense to do so.
+
+2) If excerpts are NOT relevant to the query:
+- Apologize to the user, saying, "Sorry, that is not in the database." 
+- Respond short, brief, and dry while being sure to mention that the information is not in the database.
+
+3) If query pertains to chat history:
+- Utilize context from chat history and the previous AI responses to answer the query.
+- Try to utilize (1) to enrich response with additional relevant information if possible.
+
+# Response Guidelines
+Always ensure your responses are backed by the books. Respond in an engaging, conversational manner, 
+anticipating further queries from the user.
+
+# Excerpts
 {context}
-Query: {query}
-Helpful Answer:"""
+
+# Query
+{query}
+
+# Chat History
+{history}
+
+# Helpful Answer
+"""
 
 RAG_PROMPT = PromptTemplate(input_variables=["context", "query"], template=_RAG_PROMPT_TEMPLATE)
 
@@ -47,8 +79,8 @@ RAG_PROMPT = PromptTemplate(input_variables=["context", "query"], template=_RAG_
 class PineconeAgent(ChainableAgent):
     def __init__(self, title, **kwargs):
         self.embeddings = OpenAIEmbeddings()
-        self.vector_store = PineconeVectorStore(index_name='langchain-test-index', embedding=self.embeddings)
-        self.retriever = self.vector_store.as_retriever()
+        self.vector_store = PineconeVectorStore(index_name='vector-vault-1', embedding=self.embeddings)
+        self.retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
         super().__init__(title, **kwargs)
 
     @register_chain
@@ -60,11 +92,18 @@ class PineconeAgent(ChainableAgent):
             Get the context of a query from the vector store
             """
             docs = self.retriever.invoke(query)
+            context = ""
+            for i, doc in enumerate(docs):
+                context += f"## Document {i+1}\n"
+                context += f"### File Name: {doc.metadata['file_name'].split('.')[-1]}\n"
+                context += f"### Page: {doc.metadata['page']}\n"
+                context += f"### Content:\n{doc.page_content}\n\n"
 
-            return "\n\n".join(doc.page_content for doc in docs)
+            return context
 
         rag_chain = (
             RunnablePassthrough.assign(context=get_context_tool)
+            | RunnablePassthrough.assign(history=RunnableLambda(st.session_state.memory_cache.load_memory_variables) | itemgetter('history'))
             | RAG_PROMPT
             | self.llm
             | StrOutputParser()

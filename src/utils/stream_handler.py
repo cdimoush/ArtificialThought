@@ -9,7 +9,9 @@ from src.app.ui_component import display_message, display_info
 
 class StreamHandler(BaseCallbackHandler):
     def __init__(self):
-        self.container = st.empty()
+        # Initialize separate containers for tool output and LLM text
+        self.tool_container = st.empty()
+        self.llm_container = st.empty()
 
     def on_tool_end(self, output: Any, *, run_id: UUID, parent_run_id: UUID | None = None, **kwargs: Any) -> Any:
         """
@@ -25,13 +27,14 @@ class StreamHandler(BaseCallbackHandler):
         if hasattr(st.session_state, 'memory_handler') and len(st.session_state.memory_handler) > 0:
             st.session_state.memory_handler.update_last_info(info)
 
-        # Display the updated info
-        display_info(info)
+        # Display the updated info in the tool container
+        display_info(info, container=self.tool_container)
 
     def on_llm_new_token(self, token: str, **kwargs):
         st.session_state.memory_handler.append_last_message(token)
         message, _ = st.session_state.memory_handler[-1]
-        display_message(message, container=self.container)
+        # Display the message in the LLM container
+        display_message(message, container=self.llm_container)
 
 def get_streamhandler_cb() -> BaseCallbackHandler:
     """
