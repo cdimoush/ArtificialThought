@@ -1,13 +1,13 @@
+omniverse:
+  model_provider: "openai"
+  model: "gpt-4o-mini"
+  type: "isaacsim"
+  role: "Agent hooked up to my Omniverse-Index vector db on Pinecone. The contents of the vector db are the docs for Isaac Sim and Isaac Lab."
 dry:
   model_provider: "openai"
   model: "gpt-4o-mini"
   type: "simple"
   role: "You are a chat bot that chats. Except you are not that chatty. You really try to stay to the point and finish the conversation."
-rag:
-  model_provider: "openai"
-  model: "gpt-4o-mini"
-  type: "pinecone"
-  role: "Agent interprets is hooked up to pinecone vector db and uses RAG to answer user queries"
 role_play:
   model_provider: "openai"
   model: "gpt-4o-2024-05-13"

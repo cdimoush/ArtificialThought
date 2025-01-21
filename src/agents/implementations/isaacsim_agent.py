@@ -36,7 +36,7 @@ def tool_handler(func):
 
 _RAG_PROMPT_TEMPLATE = """
 # Role
-You are a futuristic librarian softwareprogram, assisting a user with their query. 
+You are a futuristic librarian softwareprogram, specializing in Isaac Sim and Isaac Lab, assisting a user with their query. 
 
 # Task
 You've consulted your vast collection of technical books and found some excerpts that might be relevant. 
@@ -61,6 +61,11 @@ Now, carefully examine these excerpts to determine their relevances and respond 
 Always ensure your responses are backed by the books. Respond in an engaging, conversational manner, 
 anticipating further queries from the user.
 
+# Specialization
+As a specialist in Isaac Sim and Isaac Lab:
+- Isaac Sim is a powerful simulation tool within the NVIDIA Omniverse ecosystem, designed specifically for robotics. It allows users to create, test, and visualize robotic applications in a highly realistic virtual environment.
+- Isaac Lab is a framework within Isaac Sim that provides APIs and modular setups for conducting reinforcement learning and imitation learning experiments. It simplifies the process of designing and running robotics experiments, supporting various workflows and connecting to peripheral devices for demonstration purposes.
+
 # Excerpts
 {context}
 
@@ -76,28 +81,47 @@ anticipating further queries from the user.
 RAG_PROMPT = PromptTemplate(input_variables=["context", "query"], template=_RAG_PROMPT_TEMPLATE)
 
 @register_agent
-class PineconeAgent(ChainableAgent):
+class IsaacSimAgent(ChainableAgent):
     def __init__(self, title, **kwargs):
         self.embeddings = OpenAIEmbeddings()
-        self.vector_store = PineconeVectorStore(index_name='vector-vault-1', embedding=self.embeddings)
+        self.vector_store = PineconeVectorStore(index_name='omniverse-index', embedding=self.embeddings)
         self.retriever = self.vector_store.as_retriever(search_kwargs={"k": 3})
         super().__init__(title, **kwargs)
 
+    def get_full_doc_context(self, source):
+        metadata_filter = {"source": {"$eq": source}}
+        results = self.vector_store.similarity_search(
+            query="",
+            k=500,
+            filter=metadata_filter
+        )
+        sorted_results = sorted(results, key=lambda doc: float(doc.metadata.get('chunk_id', 0)))
+        doc_context = ''.join(doc.page_content for doc in sorted_results)
+
+        return doc_context
+
     @register_chain
     def rag_chain(self):  
-        # @tool_handler
         @tool
         def get_context_tool(query: str):
             """
             Get the context of a query from the vector store
             """
-            docs = self.retriever.invoke(query)
+            chunks = self.retriever.invoke(query)
             context = ""
-            for i, doc in enumerate(docs):
-                context += f"## Document {i+1}\n"
-                context += f"### File Name: {doc.metadata['file_name'].split('.')[-1]}\n"
-                context += f"### Page: {doc.metadata['page']}\n"
-                context += f"### Content:\n{doc.page_content}\n\n"
+            doc_list = []
+
+            for chunk in chunks:
+                source = chunk.metadata['source']
+                file_name = chunk.metadata['file_name']
+
+                if source not in doc_list:
+                    doc_list.append(source)
+                    doc_context = self.get_full_doc_context(source)
+                    
+                    context += f"## Document {len(doc_list)}\n"
+                    context += f"### File Name: {file_name}\n"
+                    context += f"### Content:\n{doc_context}\n\n"
 
             return context
 
